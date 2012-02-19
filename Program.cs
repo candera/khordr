@@ -97,11 +97,6 @@ namespace kchordr
     
     class Program
     {
-        public static int IsKeyboard(int device)
-        {
-            return Interception.IsKeyboard(device);
-        }
-
         static void Main(string[] args)
         {
             IntPtr context;
@@ -110,7 +105,7 @@ namespace kchordr
 
             context = Interception.CreateContext();
 
-            Interception.SetFilter(context, IsKeyboard, Interception.Filter.All);
+            Interception.SetFilter(context, Interception.IsKeyboard, Interception.Filter.All);
 
             while (Interception.Receive(context, device = Interception.Wait(context), ref stroke, 1) > 0)
             {

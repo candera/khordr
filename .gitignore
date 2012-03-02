@@ -3,3 +3,6 @@
 /obj
 /bin
 *.user
+.lein-deps-sum
+.lein-failures
+lib/

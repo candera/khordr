@@ -36,3 +36,7 @@
 ;;  }
 
 ;; Interception.DestroyContext(context);
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(System/setProperty "jna.library.path" "ext")

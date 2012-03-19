@@ -40,3 +40,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (System/setProperty "jna.library.path" "ext")
+
+(interception.TestLibrary/INSTANCE)
+(import interception.TestLibrary)

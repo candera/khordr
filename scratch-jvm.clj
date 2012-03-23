@@ -43,3 +43,13 @@
 
 (interception.TestLibrary/INSTANCE)
 (import interception.TestLibrary)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(in-ns 'kchordr.core)
+
+(process (key-state) :j :dn)
+
+(def jdn (process (key-state) :j :dn))
+
+(process jdn :q :dn)

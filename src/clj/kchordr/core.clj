@@ -3,7 +3,14 @@
 (def ^{:private true
        :doc "Map of keys to classes. Absence from this list means it's a normal key."}
   key-classes
-  {:j [:modifier-alias :lshift]})
+  {:j [:modifier-alias :rshift]})
+
+(defn key-alias
+  "Given a key, give the key it aliases to."
+  [key]
+  (if-let [alias (get key-classes key)]
+    (second alias)
+    key))
 
 (defn key-state
   "Returns a new key-state object."
@@ -68,20 +75,28 @@
   (->> keystate
        (filter undecided?)
        (map first)
-       (mapcat (fn [k] [k :dn]))))
+       (mapcat (fn [k] [(key-alias k) :dn]))))
+
+(defn decide-modifier
+  "Given a keystate map, and a vector containing a key and its state,
+  assoc the appropriate new state for the key into the keytstate. The
+  appopriate state depends on whether the key is undecided. If it is,
+  the state comes from the key-classes map. Otherwise, the key state
+  remains unchanged."
+  [keystate ks]
+  (assoc keystate (first ks) (if (undecided? ks)
+                               (second (get key-classes (second ks)))
+                               (second ks))))
 
 ;; {:j :undecided :k :lcontrol} => {:j :lshift :k :lcontrol}
 (defn decide-modifiers
-  "Return a sequence of key events for undecided modifiers, deciding
-  them to be their aliased equivalents.
+  "Return a new keystate wherein undecided modifiers have been decided
+  to be their aliased equivalents.
 
   {:j :undecided :k :undecided :l :lalt} =>
-  [:rshift :dn :rcontrol :dn]"
+  [:j :rshift :k :rcontrol :l :lalt]"
   [keystate]
-  (into {} (map (fn [ks] (if (undecided? ks)
-                           [(first ks) (second (get key-classes (second k)))]
-                           ks))
-                keystate)))
+  (reduce decide-modifier {} keystate))
 
 (defn process
   "Given the current key state and a key event, return an updated key
@@ -99,11 +114,10 @@
        :to-send (concat (:to-send state)
                         (undecided-modifier-downs keystate)
                         [key :dn])
-       :keystate (apply assoc keystate
-                   (decide-modifiers keystate)))
+       :keystate (decide-modifiers keystate))
 
      :else
-     (update-in state [:to-send] #(conj % [key direction])))))
+     (update-in state [:to-send] #(concat % [[key direction]])))))
 
 (defn to-send
   "Given a key state, return any pending key events, in the form of

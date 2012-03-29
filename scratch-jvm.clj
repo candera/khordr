@@ -46,6 +46,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(require 'kchordr.core)
 (in-ns 'kchordr.core)
 
 (process (key-state) :j :dn)
@@ -53,3 +54,9 @@
 (def jdn (process (key-state) :j :dn))
 
 (process jdn :q :dn)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(map (partial apply event) [[:b :dn] [:b :up]])
+
+(event :b :dn)

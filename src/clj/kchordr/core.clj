@@ -1,5 +1,5 @@
 (ns kchordr.core
-  (:refer-clojure :exclude [key name]))
+  (:refer-clojure :exclude [key]))
 
 (def ^{:private true
        :doc "Map of keys to classes. Absence from this list means it's a normal key."}
@@ -16,8 +16,7 @@
 (defn state
   "Returns a new key-state object."
   []
-  {:to-send []
-   :state :ground})
+  {:to-send []})
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -25,18 +24,8 @@
 
 (defn event
   "Given a key name and a direction, return a new key event."
-  [name direction]
-  [name direction])
-
-(defn key
-  "Given a key event, return the key."
-  [event]
-  (first event))
-
-(defn direction
-  "Given a key event, return the direction."
-  [event]
-  (second event))
+  [key direction]
+  {:key key :direction direction})
 
 (defn append
   "Append bs to a, where bs and a are (potentially empty) sequences of
@@ -108,8 +97,7 @@
 (defn process
   "Given the current state and a key event, return an updated state."
   [state event]
-  (let [key (key event)
-        direction (direction event)
+  (let [{:keys [key direction]} event
         cls (get key-classes key :normal)
         keystate (:keystate state)]
     (cond
@@ -127,8 +115,3 @@
      :else
      (assoc state :to-send (append (:to-send state) (event key direction))))))
 
-(defn to-send
-  "Given a key state, return any pending key events, in the form of
-  [key direction] pairs."
-  [state]
-  (:to-send state))

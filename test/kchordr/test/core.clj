@@ -5,16 +5,12 @@
 (defn- sent
   "Given a sequence of key events, return the sequence of keys that
   will actually be sent."
-  [presses]
-  (loop [state (state)
-         press presses]
-    (if (seq presses)
-      (recur (process state press)
-             (rest (rest presses)))
-      (to-send state))))
+  [events]
+  (:to-send (reduce #(process %1 %2) (state) events)))
 
 (deftest key-tests
-  (are [pressed anticipated] (= anticipated (sent pressed))
+  (are [pressed anticipated]
+       (= anticipated (sent (map (partial apply event) pressed)))
        ;; Single non-modifier key press
        [[:b :dn]]
        [[:b :dn]]

@@ -10,7 +10,10 @@
 
 (deftest key-tests
   (are [pressed anticipated]
-       (= anticipated (sent (map (partial apply event) pressed)))
+       ;; We use vectors as the test format because they're easier to
+       ;; read, but we still want to use maps as the underlying
+       ;; construct for their flexibility. Yay juxt!
+       (= anticipated (map (juxt :key :direction) (sent (map ->event pressed))))
        ;; Single non-modifier key press
        [[:b :dn]]
        [[:b :dn]]

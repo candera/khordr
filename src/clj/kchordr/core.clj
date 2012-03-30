@@ -1,6 +1,13 @@
 (ns kchordr.core
   (:refer-clojure :exclude [key]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn no-op [& args])
+(def log no-op)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (def ^{:private true
        :doc "Map of keys to classes. Absence from this list means it's a normal key."}
   key-classes
@@ -22,10 +29,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key events
 
-(defn event
-  "Given a key name and a direction, return a new key event."
-  [key direction]
-  {:key key :direction direction})
+(defn ->event
+  "Given a key name and a direction, either as individual arguments or
+  as a two-element sequence, return a new key event."
+  ([[key direction]] (->event key direction))
+  ([key direction] {:key key :direction direction}))
 
 (defn append
   "Append bs to a, where bs and a are (potentially empty) sequences of
@@ -66,12 +74,12 @@
   (and (regular-key? key) (= direction :dn)))
 
 (defn undecided-modifier-downs
-  "Return a seq of keypresses for the undecided modifiers."
+  "Return a seq of events for the undecided modifiers."
   [keystate]
   (->> keystate
        (filter undecided?)
        (map first)
-       (mapcat (fn [k] [(key-alias k) :dn]))))
+       (map (fn [k] (->event (key-alias k) :dn)))))
 
 (defn decide-modifier
   "Given a keystate map, and a vector containing a key and its state,
@@ -100,18 +108,29 @@
   (let [{:keys [key direction]} event
         cls (get key-classes key :normal)
         keystate (:keystate state)]
+    (log "Beginning state is" state)
+    (log "Processing event" key direction)
+    (log "Key class is" cls)
+    (log "Keystate is" keystate)
     (cond
      (and (modifier-alias? cls) (= :dn direction))
-     (update-in state [:keystate key] (constantly :undecided))
+     (do
+       (log "Modifier" key "being pressed")
+       (update-in state [:keystate key] (constantly :undecided)))
 
      (and (undecided-modifier? keystate)
           (regular-keydown? key direction))
-     (assoc state
-       :to-send (append (:to-send state)
-                        (undecided-modifier-downs keystate)
-                        (event key :dn))
-       :keystate (decide-modifiers keystate))
+     (do
+       (log "Regular key" key
+            "being pressed while there are undecided modifiers")
+       (assoc state
+         :to-send (concat (:to-send state)
+                          (undecided-modifier-downs keystate)
+                          [(->event key :dn)])
+         :keystate (decide-modifiers keystate)))
 
      :else
-     (assoc state :to-send (append (:to-send state) (event key direction))))))
+     (do
+       (log "Default processing for" key direction)
+       (update-in state [:to-send] append (->event key direction))))))
 

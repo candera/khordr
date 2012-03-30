@@ -49,14 +49,13 @@
 (require :reload 'kchordr.core)
 (in-ns 'kchordr.core)
 
-(process (state) (->event :q :dn))
+(process (state default-key-behaviors) (->event :q :dn))
 
-(def jdn (process (state) (->event :j :dn)))
+(def jdn (process (state default-key-behaviors) (->event :j :dn)))
 
 (process jdn (->event :j :up))
-(process jdn :q :dn)
+(process jdn (->event :q :dn))
 jdn
-(process (state) (->event :x :dn ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -80,4 +79,24 @@ process: state, evt -> state
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(undecided-modifier-downs {:j :undecided})
+(undecided-modifier-downs jdn)
+
+(get-in jdn [:behaviors :q])
+(modifier-alias? nil)
+
+(undecided-modifier? (:keystate jdn))
+
+(regular-key? jdn :j)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(require :reload 'kchordr.core)
+(decide-modifiers jdn)
+(clojure.repl/doc decide-modifier)
+
+(decide-modifier jdn [:j :undecided])
+
+(reduce println jdn (:keystate state))
+
+(concat (:to-send jdn) (undecided-modifier-downs jdn) [(->event :q :dn)])
+
+(clojure.pprint/pprint  (process jdn (->event :q :dn)))

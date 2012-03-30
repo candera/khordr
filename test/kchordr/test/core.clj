@@ -14,19 +14,37 @@
        ;; read, but we still want to use maps as the underlying
        ;; construct for their flexibility. Yay juxt!
        (= anticipated (map (juxt :key :direction) (sent (map ->event pressed))))
-       ;; Single non-modifier key press
+       ;; Single regular key press
        [[:b :dn]]
        [[:b :dn]]
 
-       ;; Single non-modified key press and release
+       ;; Single regular key press and release
        [[:b :dn] [:b :up]]
        [[:b :dn] [:b :up]]
 
-       ;; Modified key press only
+       ;; Modifier alias press only
        [[:j :dn]]
        []
 
-       ;; Modified shifted key
+       ;; Modifier alias press and release
+       [[:j :dn] [:j :up]]
+       [[:j :dn] [:j :up]]
+
+       ;; Modifier alias repeat and release
+       [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
+       [[:j :dn] [:j :up]]
+
+       ;; Modifier alias with regular key press
        [[:j :dn] [:x :dn]]
-       [[:rshift :dn] [:x :dn]]))
+       [[:rshift :dn] [:x :dn]]
+
+       ;; Modifier alias with regular key press and release
+       [[:j :dn] [:x :dn] [:x :up] [:j :up]]
+       [[:rshift :dn] [:x :dn] [:x :up] [:rshift :up]]
+
+       ;; Modifier alias with regular key press and release followed
+       ;; by modifier alias press and release
+       [[:j :dn] [:x :dn] [:x :up] [:j :up] [:j :dn] [:j :up]]
+       [[:rshift :dn] [:x :dn] [:x :up] [:rshift :up] [:j :dn] [:j :up]]
+       ))
 

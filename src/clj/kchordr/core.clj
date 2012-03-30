@@ -112,6 +112,7 @@
     (log "Processing event" key direction)
     (log "Key behavior is" behavior)
     (log "Keystate is" keystate)
+    ;; TODO: Change the cond statement out for core.match
     (cond
      (and (modifier-alias? behavior) (= :dn direction))
      (do

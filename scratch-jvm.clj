@@ -46,17 +46,38 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(require 'kchordr.core)
+(require :reload 'kchordr.core)
 (in-ns 'kchordr.core)
 
-(process (key-state) :j :dn)
+(process (state) (->event :q :dn))
 
-(def jdn (process (key-state) :j :dn))
+(def jdn (process (state) (->event :j :dn)))
 
+(process jdn (->event :j :up))
 (process jdn :q :dn)
+jdn
+(process (state) (->event :x :dn ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(map (partial apply event) [[:b :dn] [:b :up]])
+(map #(apply ->event %) [[:b :dn] [:b :up]])
 
-(event :b :dn)
+(->event :b :dn)
+
+(update-in {:to-send []} [:to-send] append (->event :x :up))
+
+(append [(->event :x :up)] (->event :x :dn))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+evt: {:key :j :direction :dn}
+
+state: 
+{:to-send [evt evt evt]
+ :keystate {:j :undecided, :k :right-control}}
+
+process: state, evt -> state
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(undecided-modifier-downs {:j :undecided})

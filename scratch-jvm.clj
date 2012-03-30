@@ -8,28 +8,38 @@
 (import 'interception.InterceptionLibrary)
 (let [ctx (.interception_create_context InterceptionLibrary/INSTANCE)]
   (try
-;; Interception.SetFilter(context, Interception.IsKeyboard, Interception.Filter.All);
-    (.interception_set_filter InterceptionLibrary/INSTANCE ctx (reify interception.InterceptionLibrary$InterceptionPredicate
-                                    (apply [_ device] (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
-                              (short -1))
-;; while (Interception.Receive(context, device = Interception.Wait(context), ref stroke, 1) > 0)
-;; {
-;;  Console.WriteLine("SCAN CODE: {0}/{1}", stroke.key.code, stroke.key.state);
-    (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
-          stroke (interception.InterceptionKeyStroke$ByReference.)]
-      (if (< 0 (.interception_receive InterceptionLibrary/INSTANCE ctx device stroke 1))
-        (println "SCAN CODE: " (.code stroke) (.state stroke))))
-;;  if (stroke.key.code == ScanCode.X) 
-;;  {
-;;   stroke.key.code = ScanCode.Y;
-;;   }
-;;  Interception.Send(context, device, ref stroke, 1);
+    (.interception_set_filter
+     InterceptionLibrary/INSTANCE
+     ctx
+     (reify interception.InterceptionLibrary$InterceptionPredicate
+       (apply [_ device]
+         (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
+     (short -1))
 
+    (dotimes [n 5000o]
+      (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
+            stroke (interception.InterceptionKeyStroke$ByReference.)
+            received (.interception_receive
+                      InterceptionLibrary/INSTANCE
+                      ctx
+                      device
+                      stroke
+                      1)]
+
+        (when (< 0 received)
+          (println "received:" received (.code stroke) (.state stroke))
+          ;; (when (= 0x15 (.code stroke))
+          ;;   (set! (.code stroke) 0x2d))
+          (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
+          ;;  // Hitting escape terminates the program
+          ;;  if (stroke.key.code == ScanCode.Escape)
+          (if (= 0x01 (.code stroke))
+            (println "quitting")
+            (recur)))))
     (finally
      (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))
 
-;;  // Hitting escape terminates the program
-;;  if (stroke.key.code == ScanCode.Escape)
+
 ;;  {
 ;;   break;
 ;;   }

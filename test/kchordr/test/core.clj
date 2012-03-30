@@ -6,7 +6,7 @@
   "Given a sequence of key events, return the sequence of keys that
   will actually be sent."
   [events]
-  (:to-send (reduce #(process %1 %2) (state) events)))
+  (:to-send (reduce #(process %1 %2) (state default-key-behaviors) events)))
 
 (deftest key-tests
   (are [pressed anticipated]

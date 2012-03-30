@@ -312,12 +312,12 @@ public interface InterceptionLibrary extends Library {
      * Original signature : <code>__attribute__((dllimport)) int interception_send(InterceptionContext, InterceptionDevice, const InterceptionStroke*, unsigned int)</code><br>
      * <i>native declaration : line 179</i>
      */
-    int interception_send(Pointer context, int device, Pointer stroke, int nstroke);
+    int interception_send(Pointer context, int device, InterceptionKeyStroke.ByReference stroke, int nstroke);
     /**
      * Original signature : <code>__attribute__((dllimport)) int interception_receive(InterceptionContext, InterceptionDevice, InterceptionStroke*, unsigned int)</code><br>
      * <i>native declaration : line 181</i>
      */
-    int interception_receive(Pointer context, int device, Pointer stroke, int nstroke);
+    int interception_receive(Pointer context, int device, InterceptionKeyStroke.ByReference stroke, int nstroke);
     /**
      * Original signature : <code>__attribute__((dllimport)) int interception_is_invalid(InterceptionDevice)</code><br>
      * <i>native declaration : line 183</i>

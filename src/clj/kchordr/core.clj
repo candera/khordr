@@ -1,5 +1,6 @@
 (ns kchordr.core
-  (:refer-clojure :exclude [key]))
+  (:refer-clojure :exclude [key])
+  (:use [clojure.core.match :only (match)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -8,27 +9,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defprotocol KeyBehavior
-  "Defines behavior of a mapped key."
-  (modifier-alias? [this])
-  (regular? [this]))
-
-(extend-protocol KeyBehavior
-
-  ;; Nil defines the behavior for normal keys
-  nil
-  (modifier-alias? [_] false)
-  (regular? [_] true))
-
-;; A key mapping to a modifier like shift or control
-(defrecord ModifierAlias [alias]
-  KeyBehavior
-  (modifier-alias? [_] true)
-  (regular? [_] false))
-
-(def ^{:doc "Map of keys to behaviors. Absence from this list means it's a normal key."}
+(def ^{:doc "Map of keys to behaviors. Absence from this list means it's a regular key."}
   default-key-behaviors
-  {:j (ModifierAlias. :rshift)})
+  {:j [:modifier-alias :rshift]})
 
 (defn state
   "Returns a new key-state object."
@@ -63,7 +46,7 @@
 (defn regular-key?
   "Return true if key is a regular key."
   [state key]
-  (regular? (get-in state [:behaviors key])))
+  (not (get-in state [:behaviors key])))
 
 (defn regular-keydown?
   "Return true if the key event is a key down event where the key is
@@ -102,36 +85,43 @@
   [state]
   (:keystate (reduce decide-modifier state (:keystate state))))
 
+(defn handle-modifier-press
+  "Return a new state that records the pressed modifier as undecided."
+  [state key]
+  (log "Modifier" key "being pressed")
+  (update-in state [:keystate key] (constantly :undecided)))
+
+(defn handle-deciding-regular-press
+  "Return a new state that decides undecided modifiers, add down events
+  for their aliases to the state and recording them as decided."
+  [state key]
+  (log "Regular key" key
+       "being pressed while there are undecided modifiers")
+  (assoc state
+    :to-send (concat (:to-send state)
+                     (undecided-modifier-downs state)
+                     [(->event key :dn)])
+    :keystate (decide-modifiers state)))
+
+(defn handle-default
+  "Handle a key event by simply appending it to the list of events to
+  transmit."
+  [state key direction]
+  (log "Default processing for" key direction)
+  (update-in state [:to-send] append (->event key direction)))
+
 (defn process
   "Given the current state and a key event, return an updated state."
   [state event]
   (let [{:keys [key direction]} event
-        behavior (get-in state [:behaviors key])
+        [keyclass alias] (get-in state [:behaviors key] [:regular])
         keystate (:keystate state)]
     (log "Beginning state is" state)
     (log "Processing event" key direction)
-    (log "Key behavior is" behavior)
+    (log "Key behavior is" [keyclass alias])
     (log "Keystate is" keystate)
-    ;; TODO: Change the cond statement out for core.match
-    (cond
-     (and (modifier-alias? behavior) (= :dn direction))
-     (do
-       (log "Modifier" key "being pressed")
-       (update-in state [:keystate key] (constantly :undecided)))
-
-     (and (undecided-modifier? keystate)
-          (regular-keydown? state key direction))
-     (do
-       (log "Regular key" key
-            "being pressed while there are undecided modifiers")
-       (assoc state
-         :to-send (concat (:to-send state)
-                          (undecided-modifier-downs state)
-                          [(->event key :dn)])
-         :keystate (decide-modifiers state)))
-
-     :else
-     (do
-       (log "Default processing for" key direction)
-       (update-in state [:to-send] append (->event key direction))))))
+    (match [keyclass direction (undecided-modifier? keystate)]
+           [:modifier-alias :dn _] (handle-modifier-press state key)
+           [:regular :dn true] (handle-deciding-regular-press state key)
+           [_ _ _] (handle-default state key direction))))
 

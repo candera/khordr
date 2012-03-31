@@ -1,6 +1,7 @@
 (defproject kchordr "1.0.0-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.3.0"]
+                 [org.clojure/core.match "0.2.0-alpha9"]
                  [net.java.dev.jna/jna "3.4.0"]
                  [com.nativelibs4java/jnaerator-runtime "0.9.10-SNAPSHOT"]
                  ;;[kchordr/interception "1.0.0"]

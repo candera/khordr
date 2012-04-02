@@ -1,6 +1,8 @@
 (ns kchordr.core
   (:refer-clojure :exclude [key])
-  (:use [clojure.core.match :only (match)]))
+  (:use [clojure.core.match :only (match)]
+        kchordr.keycodes)
+  (:import interception.InterceptionLibrary))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -125,3 +127,51 @@
            [:regular :dn true] (handle-deciding-regular-press state key)
            [_ _ _] (handle-default state key direction))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn intercept
+  "Start intercepting keys, calling the function (or var) with the
+  received key event f until it returns false."
+  [f]
+  ;; TODO: This next statement needs to happen before this library loads
+  ;; (System/setProperty "jna.library.path" "ext")
+
+  ;; And this one should live somewhere else entirely
+  ;;(import 'interception.InterceptionLibrary)
+  
+  (let [ctx (.interception_create_context InterceptionLibrary/INSTANCE)]
+    (try
+      (.interception_set_filter
+       InterceptionLibrary/INSTANCE
+       ctx
+       (reify interception.InterceptionLibrary$InterceptionPredicate
+         (apply [_ device]
+           (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
+       (short -1))
+      (loop []
+        (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
+              stroke (interception.InterceptionKeyStroke$ByReference.)
+              received (.interception_receive
+                        InterceptionLibrary/INSTANCE
+                        ctx
+                        device
+                        stroke
+                        1)]
+
+          (when (< 0 received)
+            ;; TODO: figure out how this should work - what function
+            ;; should call what other function? Should there be a
+            ;; trampoline involved?
+            (let [state (.state stroke)
+                  direction (if (bit-test state 1) :up :dn)
+                  e0 (when (bit-test state 2) :e0)
+                  e1 (when (bit-test state 3) :e1)
+                  key-index (filter identity [(.code stroke) e0 e1])
+                  key (get kchordr.keycodes/keycodes key-index (.code stroke))
+                  result (.invoke f (->event key direction))]
+              ;; For now, just always send on the keystrokes
+              (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
+              (when result
+                (recur))))))
+      (finally
+       (.interception_destroy_context InterceptionLibrary/INSTANCE ctx)))))

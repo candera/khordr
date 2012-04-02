@@ -16,7 +16,7 @@
          (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
      (short -1))
 
-    (dotimes [n 5000o]
+    (dotimes [n 50]
       (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
             stroke (interception.InterceptionKeyStroke$ByReference.)
             received (.interception_receive
@@ -31,11 +31,16 @@
           ;; (when (= 0x15 (.code stroke))
           ;;   (set! (.code stroke) 0x2d))
           (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
+          ;; If it's a y, send an additional x
+          (when (= 0x15 (.code stroke))
+            (set! (.code stroke) 0x2d)
+            (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1))
           ;;  // Hitting escape terminates the program
           ;;  if (stroke.key.code == ScanCode.Escape)
           (if (= 0x01 (.code stroke))
             (println "quitting")
-            (recur)))))
+            ;(recur)
+            ))))
     (finally
      (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))
 
@@ -110,3 +115,21 @@ process: state, evt -> state
 (concat (:to-send jdn) (undecided-modifier-downs jdn) [(->event :q :dn)])
 
 (clojure.pprint/pprint  (process jdn (->event :q :dn)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn handle-event [event]
+  (let [{:keys [key direction]} event]
+    (println "received" key direction)
+    (not (or (= key 1) (= key :esc)))))
+
+;; Almost working! Problems: 1) :up and :dn don't seem to be decoding
+;; properly. 2) Not every key is decoding right. The menu key at least
+;; seems to be wrong. Need to check them all.
+(System/setProperty "jna.library.path" "ext")
+(require :reload 'kchordr.core)
+(kchordr.core/intercept #'handle-event)
+
+
+
+

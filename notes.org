@@ -1,0 +1,7 @@
+* Notes
+** What I should work on next
+- Make the existing tests pass
+** What I should work on after that
+- Make sure we're handling the case of two equivalent modifier aliases
+  being pressed at the same time
+- Get the main loop of the app working

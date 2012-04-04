@@ -162,10 +162,11 @@
             ;; TODO: figure out how this should work - what function
             ;; should call what other function? Should there be a
             ;; trampoline involved?
+            ;; (println "raw code:" (.code stroke) "raw state:" (.state stroke))
             (let [state (.state stroke)
-                  direction (if (bit-test state 1) :up :dn)
-                  e0 (when (bit-test state 2) :e0)
-                  e1 (when (bit-test state 3) :e1)
+                  direction (if (bit-test state 0) :up :dn)
+                  e0 (when (bit-test state 1) :e0)
+                  e1 (when (bit-test state 2) :e1)
                   key-index (filter identity [(.code stroke) e0 e1])
                   key (get kchordr.keycodes/keycodes key-index (.code stroke))
                   result (.invoke f (->event key direction))]

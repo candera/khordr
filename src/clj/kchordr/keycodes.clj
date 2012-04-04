@@ -103,5 +103,6 @@
    [72] :kp8
    [73] :kp9
    [83] :kpperiod
+   [78] :kpplus
    [28 :e0] :kpenter})
 

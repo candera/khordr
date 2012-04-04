@@ -118,18 +118,16 @@ process: state, evt -> state
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Working! The only weirdness is around printscreen and pause, which
+;; both generate multiple keypresses. Since I don't care about those
+;; at the moment, I'm not going to bother with them.
 (defn handle-event [event]
   (let [{:keys [key direction]} event]
     (println "received" key direction)
     (not (or (= key 1) (= key :esc)))))
 
-;; Almost working! Problems: 1) :up and :dn don't seem to be decoding
-;; properly. 2) Not every key is decoding right. The menu key at least
-;; seems to be wrong. Need to check them all.
 (System/setProperty "jna.library.path" "ext")
-(require :reload 'kchordr.core)
+(require :reload-all 'kchordr.core)
 (kchordr.core/intercept #'handle-event)
-
-
 
 

@@ -1,5 +1,5 @@
 (ns kchordr.core
-  (:refer-clojure :exclude [key])
+  (:refer-clojure :exclude [key send])
   (:use [clojure.core.match :only (match)]
         kchordr.keycodes)
   (:import interception.InterceptionLibrary))
@@ -13,8 +13,13 @@
 
 (def ^{:doc "Map of keys to behaviors. Absence from this list means it's a regular key."}
   default-key-behaviors
-  {:j [:modifier-alias :rshift]})
+  {:j {:keyclass :modifier-alias :alias :rshift}})
 
+;; {:keystate {:j :undecided :k :rcontrol}
+;;  :to-send ({:key :q :direction :dn}
+;;            {:key :r :direction :up})
+;;  :behaviors {:j {:keyclass :modifier-alias :alias :rshift]
+;;              :k {:keyclass :modifier-alias :alias :rcontrol]}}
 (defn state
   "Returns a new key-state object."
   [behaviors]
@@ -59,7 +64,6 @@
 (defn undecided-modifier-downs
   "Return a seq of events for the undecided modifiers."
   [state]
-  {:keystate {:j :undecided}}
   (->> (:keystate state)
        (filter (fn [[k v]] (= v :undecided)))
        (map first)
@@ -105,6 +109,36 @@
                      [(->event key :dn)])
     :keystate (decide-modifiers state)))
 
+(defn alias
+  "Return the alias of key, or nil if none."
+  [state key]
+  (get-in state [:keystate key]))
+
+(defn aliasing?
+  "Return true if key is currently being aliased to something else."
+  [state key]
+  (let [alias (get-in state [:keystate key])]
+    (and alias (not= :undecided alias))))
+
+(defn send
+  "Return a state object with the additional key events added to the
+  :to-send seq."
+  [state & events]
+  (->> events
+       (partition 2)
+       (map #(apply ->event %))
+       (update-in state [:to-send] concat)))
+
+(defn release-modifier-alias
+  "When a modifier key goes up, we need to send a key down & up for the
+  key itself (if it is not yet aliasing) or a key up for the unaliased
+  key."
+  [state key]
+  (let [state (if (aliasing? state key)
+                (send state (alias state key) :up)
+                (send state key :dn key :up))]
+    (update-in state [:keystate] #(dissoc % key))))
+
 (defn handle-default
   "Handle a key event by simply appending it to the list of events to
   transmit."
@@ -116,7 +150,10 @@
   "Given the current state and a key event, return an updated state."
   [state event]
   (let [{:keys [key direction]} event
-        [keyclass alias] (get-in state [:behaviors key] [:regular])
+        {:keys [keyclass alias]} (get-in
+                                  state
+                                  [:behaviors key]
+                                  {:keyclass :regular})
         keystate (:keystate state)]
     (log "Beginning state is" state)
     (log "Processing event" key direction)
@@ -124,6 +161,7 @@
     (log "Keystate is" keystate)
     (match [keyclass direction (undecided-modifier? keystate)]
            [:modifier-alias :dn _] (handle-modifier-press state key)
+           [:modifier-alias :up _] (release-modifier-alias state key)
            [:regular :dn true] (handle-deciding-regular-press state key)
            [_ _ _] (handle-default state key direction))))
 

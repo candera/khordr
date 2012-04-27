@@ -1,5 +1,6 @@
 (ns kchordr.test.core
-  (:use [kchordr.core])
+  (:refer-clojure :exclude (send))
+  (:require [kchordr.core :refer (state process default-key-behaviors ->event)])
   (:use [clojure.test]))
 
 (defn- sent
@@ -8,12 +9,18 @@
   [events]
   (:to-send (reduce #(process %1 %2) (state default-key-behaviors) events)))
 
+(defn- press
+  "Given a seq of pairs of [key direction], return the sent keys as a
+  similar seq."
+  [pressed]
+  (map (juxt :key :direction) (sent (map ->event pressed))))
+
 (deftest key-tests
   (are [pressed anticipated]
        ;; We use vectors as the test format because they're easier to
        ;; read, but we still want to use maps as the underlying
        ;; construct for their flexibility. Yay juxt!
-       (= anticipated (map (juxt :key :direction) (sent (map ->event pressed))))
+       (= anticipated (press pressed))
        ;; Single regular key press
        [[:b :dn]]
        [[:b :dn]]
@@ -46,5 +53,6 @@
        ;; by modifier alias press and release
        [[:j :dn] [:x :dn] [:x :up] [:j :up] [:j :dn] [:j :up]]
        [[:rshift :dn] [:x :dn] [:x :up] [:rshift :up] [:j :dn] [:j :up]]
+
        ))
 

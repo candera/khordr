@@ -68,6 +68,8 @@
 
 (def jdn (process (state default-key-behaviors) (->event :j :dn)))
 
+(handle-deciding-regular-press jdn :q)
+
 (process jdn (->event :j :up))
 (process jdn (->event :q :dn))
 jdn

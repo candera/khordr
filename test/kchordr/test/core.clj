@@ -54,5 +54,23 @@
        [[:j :dn] [:x :dn] [:x :up] [:j :up] [:j :dn] [:j :up]]
        [[:rshift :dn] [:x :dn] [:x :up] [:rshift :up] [:j :dn] [:j :up]]
 
+       ;; Multiple modifier aliases down sends nothing
+       [[:j :dn] [:k :dn]]
+       []
+
+       ;; Multiple modifier aliases down followed by regular key down
+       ;; adds both modifiers to regular key
+       [[:j :dn] [:k :dn] [:x :dn]]
+       [[:rshift :dn] [:rcontrol :dn] [:x :dn]]
+
+       ;; Order of modifier aliases down is preserved? (TODO: Is this
+       ;; what we want?)
+       [[:k :dn] [:j :dn] [:x :dn]]
+       [[:rcontrol :dn] [:rshift :dn] [:x :dn]]
+
+       ;; A modifier alias going up when another modifier is undecided
+       ;; means the second modifier was a regular keypress.
+       [[:j :dn] [:k :dn] [:k :up]]
+       [[:rshift :dn] [:k :dn] [:k :up]]
        ))
 

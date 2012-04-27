@@ -6,6 +6,7 @@
                  [com.nativelibs4java/jnaerator-runtime "0.9.10-SNAPSHOT"]
                  ;;[kchordr/interception "1.0.0"]
                  ]
+  :dev-dependencies [[lein-swank "1.4.4"]]
   :source-path "src/clj"
   ;; Use one of the two following, depending on whether you want
   ;; source or jar dependency

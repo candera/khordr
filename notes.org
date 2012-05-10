@@ -5,3 +5,56 @@
 - Make sure we're handling the case of two equivalent modifier aliases
   being pressed at the same time
 - Get the main loop of the app working
+** Thoughts on how to implement
+Right now, the app is written to have a giant switch statement, in the
+form of a core.match expression. But I think I might be able to clean
+it up a lot. The key observation is that for modifier aliases, you
+don't actually have to wait until all of the modifiers have been
+pressed. When a modifier alias goes down, it is undecided, but it can
+be decided as a modifier at the very next key press, even if the next
+press is a different modifier alias. And you can even send the aliased
+modifier down event right away.
+
+So instead of the current behavior, which is this:
+
+[:j :dn] => []
+[:j :dn :k :dn] => []
+[:j :dn :k :dn :x :dn] => [:rshift :dn :rcontrol :dn :x :dn]
+
+You'd get this:
+
+[:j :dn] => []
+[:j :dn :k :dn] => [:rshift :dn]
+[:j :dn :k :dn :x :dn] => [:rshift :dn :rcontrol :dn :x :dn]
+
+Further, I think you might be able to structure the code much better.
+I think you could define an IKeyHandler protocol that consists of
+self-down, self-up, other-down, and other-up functions. An instance of
+a record would be kept in an ordered list for every key that was down,
+in the order they were pressed. Every key pressed would be passed to
+all the handlers, in order, either to the self methods (if the handler
+was associated with the key that was pressed) or to the other methods
+(if not).
+
+So initially we'd have two implementations of the protocol:
+RegularKeyHandler and ModifierAliasKeyHandler. RegularKeyHandler would
+have a pretty simple implementation, as it would simply pass through
+self events, and do nothing at all with other events.
+ModifierAliasKeyHandler would, at self-down, go into an undecided
+state. If an other-down happened before a self-up, then it could
+transition to a decided state, and send its aliased down event.
+
+*** Questions
+**** How to send events?
+Maybe we'd pass a function to self/other-up/down that could be called
+to transmit events.
+**** Do we need the ability to suppress further processing?
+For example, if I add macros, I might need a way to prevent
+[:q :dn :z :dn] from having the :z event transmit anything. Or maybe
+this implies that the handler associated with a key can be changed as
+a result of some other key going down, so that holding down :q results
+in no other key transmitting itself.
+**** Do we really need to have the self/other and up/down split?
+Would it make more sense to just have one method on the protocol that
+handles everything? Or would we wind up doing having a bunch of
+conditional processing in every implementation?

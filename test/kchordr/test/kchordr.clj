@@ -87,5 +87,18 @@
        ;; means the second modifier was a regular keypress.
        [[:j :dn] [:k :dn] [:k :up]]
        [:key [:rshift :dn] :key [:k :dn] :key [:k :up]]
+
+       ;; We have the ability to quit the application
+       [[:backtick :dn] [:q :dn]]
+       [:quit nil]
+
+       ;; But other nearby key sequences don't quit
+       [[:backtick :dn] [:backtick :up] [:q :dn] [:backtick :dn]]
+       [:key [:backtick :dn]
+        :key [:backtick :up]
+        :key [:q :dn]
+        :key [:backtick :dn]]
+
+       ;; TODO: Also move towards using key maps to describe keys even on output
        ))
 

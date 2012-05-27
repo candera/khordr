@@ -1,4 +1,4 @@
 (ns kchordr.main
-  (:use kchordr.core))
+  (:use kchordr))
 
 

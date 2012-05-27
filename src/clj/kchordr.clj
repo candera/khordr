@@ -1,4 +1,4 @@
-(ns kchordr.core
+(ns kchordr
   (:refer-clojure :exclude [key send])
   (:use [clojure.core.match :only (match)]
         kchordr.keycodes)

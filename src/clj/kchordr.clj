@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [key send])
   (:use [clojure.core.match :only (match)]
         kchordr.keycodes)
-  (:import interception.InterceptionLibrary))
+  ;; (:import interception.InterceptionLibrary)
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -10,23 +11,89 @@
 (def log no-op)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; IKeyHandler and implementations
+;;
+
+(defprotocol IKeyHandler
+  (process [this key direction]
+    "Process a key event, returning a map. The map should contain the
+     following keys: :handler - either an implementation of
+     IKeyHandler representing the updated state of this handler or
+     nil, indicating that the handler should be removed from the
+     handler list; :effects - a seq of commands legal for consumption
+     by `engine`; :continue - true if the event should be passed to
+     later handlers in the chain."))
+
+(defrecord DefaultKeyHandler [self-key]
+  IKeyHandler
+  (process [this key direction]
+    (if (= key (:self-key this))
+      {:handler (when (= direction :dn) this)
+       :continue true
+       :effects [:key [key direction]]}
+      {:handler this
+       :effects []
+       :continue true})))
+
+
+(defrecord ModifierAliasKeyHandler [self-key alias state]
+  IKeyHandler
+  (process [this key direction]
+    (match [state (if (= key self-key) :self :other) direction]
+
+           ;; If we're undecided and we see another self-down,
+           ;; continue waiting.
+           [:undecided :self :dn]
+           {:handler this
+            :continue true}
+
+           ;; If we're undecided and we see an other-down, then we
+           ;; know that we're going to be aliasing, so we change state
+           ;; and send the alias down.
+           [:undecided :other :dn]
+           {:handler (ModifierAliasKeyHandler. self-key alias :aliasing)
+            :effects [:key [alias :dn]]
+            :continue true}
+
+           ;; If we're undecided and we see a self-up, then we're not
+           ;; aliasing, so we can just send self-down and self-up.
+           [:undecided :self :up]
+           {:handler nil
+            :effects [:key [self-key :dn] :key [self-key :up]]
+            :continue true}
+
+           ;; If we're aliasing and we see a self-down or a self-up,
+           ;; then we can just send the alias, removing ourselves from
+           ;; the chain if it's an up
+           [:aliasing :self _]
+           {:handler (when (= direction :dn) this)
+            :effects [:key [alias direction]]
+            :continue true}
+
+           ;; Otherwise, we don't change anything
+           [_ _ _]
+           {:handler this
+            :effects []
+            :continue true}
+           )))
+
+(defn make-modifier-alias
+  "Helper function to create a ModifierAliasKeyHandler in its initial
+  state."
+  [key alias]
+  (->ModifierAliasKeyHandler key alias :undecided))
+
+(defrecord SpecialActionKeyHandler [self-key]
+  ;; TODO: Implement IKeyHandler
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ^{:doc "Map of keys to behaviors. Absence from this list means it's a regular key."}
   default-key-behaviors
-  {:j {:keyclass :modifier-alias :alias :rshift}})
-
-;; {:keystate {:j :undecided :k :rcontrol}
-;;  :to-send ({:key :q :direction :dn}
-;;            {:key :r :direction :up})
-;;  :behaviors {:j {:keyclass :modifier-alias :alias :rshift]
-;;              :k {:keyclass :modifier-alias :alias :rcontrol]}}
-(defn state
-  "Returns a new key-state object."
-  [behaviors]
-  {:keystate {}
-   :to-send []
-   :behaviors behaviors})
-
+  {:j [make-modifier-alias :rshift]
+   :k [make-modifier-alias :rcontrol]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key events
@@ -44,173 +111,120 @@
   (concat a bs))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Application engine
 
-(defn undecided-modifier?
-  "Return true when the keystate contains a undecided modifier key."
-  [keystate]
-  (some (fn [[k v]] (= :undecided v)) keystate))
+(defn base-state
+  "An empty key-state value. Used for initializing the application
+  engine."
+  [behaviors]
+  {:behaviors behaviors
+   :handlers []
+   :positions {}})
 
-(defn regular-key?
-  "Return true if key is a regular key."
+(defn is-down?
+  "Return true if the specified key is in the down position."
   [state key]
-  (not (get-in state [:behaviors key])))
+  (= :dn (get-in state [:positions key])))
 
-(defn regular-keydown?
-  "Return true if the key event is a key down event where the key is
-  not aliased."
+(defn handler
+  "Return a new handler for the specified key."
+  [state key]
+  (let [[make-handler & params]
+        (get (:behaviors state) key [->DefaultKeyHandler])]
+    (apply make-handler key params)))
+
+(defn maybe-add-handler
+  "Return a state value that has been updated to include any necessary
+  new key handlers."
   [state key direction]
-  (and (regular-key? state key) (= direction :dn)))
+  ;; Is this a key down event? If not, return the state unchanged. If
+  ;; so, is the key already down? If not, create a handler and add it
+  ;; to the end of the chain. If so, return the state unchanged.
+  (if (and (= direction :dn)
+           (not (is-down? state key)))
+    (update-in state [:handlers] concat [(handler state key)])
+    state))
 
-(defn undecided-modifier-downs
-  "Return a seq of events for the undecided modifiers."
-  [state]
-  (->> (:keystate state)
-       (filter (fn [[k v]] (= v :undecided)))
-       (map first)
-       (map (fn [k] (->event (:alias (get (:behaviors state) k)) :dn)))))
-
-(defn decide-modifier
-  "Given the key state, and a vector containing a key and its status,
-  assoc the appropriate new state for the key into the keystate. The
-  appopriate state depends on whether the key is undecided. If it is,
-  the state comes from the behaviors map. Otherwise, the key status
-  remains unchanged."
-  [state [key status]]
-  (update-in state [:keystate key]
-             #(if (= :undecided status)
-                (:alias (get (:behaviors state) key))
-                %)))
-
-;; {:j :undecided :k :lcontrol} => {:j :lshift :k :lcontrol}
-(defn decide-modifiers
-  "Return a new keystate wherein undecided modifiers have been decided
-  to be their aliased equivalents.
-
-  {:j :undecided :k :undecided :l :lalt} =>
-  [:j :rshift :k :rcontrol :l :lalt]"
-  [state]
-  (:keystate (reduce decide-modifier state (:keystate state))))
-
-(defn handle-modifier-press
-  "Return a new state that records the pressed modifier as undecided."
-  [state key]
-  (log "Modifier" key "being pressed")
-  (update-in state [:keystate key] (constantly :undecided)))
-
-(defn handle-deciding-regular-press
-  "Return a new state that decides undecided modifiers, add down events
-  for their aliases to the state and recording them as decided."
-  [state key]
-  (log "Regular key" key
-       "being pressed while there are undecided modifiers")
-  (assoc state
-    :to-send (concat (:to-send state)
-                     (undecided-modifier-downs state)
-                     [(->event key :dn)])
-    :keystate (decide-modifiers state)))
-
-(defn alias
-  "Return the alias of key, or nil if none."
-  [state key]
-  (get-in state [:keystate key]))
-
-(defn aliasing?
-  "Return true if key is currently being aliased to something else."
-  [state key]
-  (let [alias (get-in state [:keystate key])]
-    (and alias (not= :undecided alias))))
-
-(defn send
-  "Return a state object with the additional key events added to the
-  :to-send seq."
-  [state & events]
-  (->> events
-       (partition 2)
-       (map #(apply ->event %))
-       (update-in state [:to-send] concat)))
-
-(defn release-modifier-alias
-  "When a modifier key goes up, we need to send a key down & up for the
-  key itself (if it is not yet aliasing) or a key up for the unaliased
-  key."
-  [state key]
-  (let [state (if (aliasing? state key)
-                (send state (alias state key) :up)
-                (send state key :dn key :up))]
-    (update-in state [:keystate] #(dissoc % key))))
-
-(defn handle-default
-  "Handle a key event by simply appending it to the list of events to
-  transmit."
+(defn update-key-positions
+  "Return a state that has been updated to reflect which keys are up
+  and which are down."
   [state key direction]
-  (log "Default processing for" key direction)
-  (update-in state [:to-send] append (->event key direction)))
+  (assoc-in state [:positions key] direction))
 
-(defn process
+(defn handle-keys
   "Given the current state and a key event, return an updated state."
   [state event]
   (let [{:keys [key direction]} event
-        {:keys [keyclass alias]} (get-in
-                                  state
-                                  [:behaviors key]
-                                  {:keyclass :regular})
-        keystate (:keystate state)]
-    (log "Beginning state is" state)
-    (log "Processing event" key direction)
-    (log "Key behavior is" [keyclass alias])
-    (log "Keystate is" keystate)
-    (match [keyclass direction (undecided-modifier? keystate)]
-           [:modifier-alias :dn _] (handle-modifier-press state key)
-           [:modifier-alias :up _] (release-modifier-alias state key)
-           [:regular :dn true] (handle-deciding-regular-press state key)
-           [_ _ _] (handle-default state key direction))))
+        ;; Important! Don't update the positions until after we add
+        ;; the new handler, since whether or not we add one depends on
+        ;; whether a key is already down.
+        state (maybe-add-handler state key direction)
+        state (update-key-positions state key direction)
+        ;; Walk the handler chain, dealing with the results at each step
+        handlers (:handlers state)
+        results (map #(process % key direction) handlers)
+        ;; If one of the handlers prevents processing from continuing,
+        ;; we don't take any subsequent effects into consideration,
+        ;; but we do let the handlers update themselves based on the
+        ;; key event. We may need to revisit this in the future for
+        ;; more complex scenarios, perhaps by making :continue provide
+        ;; an enumerated value, rather than just a boolean.
+        continue-count (count (take-while :continue results))
+        effects (mapcat :effects (take (inc continue-count) results))]
+    (-> state
+        (assoc-in [:handlers] (filter identity (map :handler results)))
+        (update-in [:effects] concat effects))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Main loop - commented out FTM
 
-(defn intercept
-  "Start intercepting keys, calling the function (or var) with the
+(comment
+ (defn intercept
+   "Start intercepting keys, calling the function (or var) with the
   received key event f until it returns false."
-  [f]
-  ;; TODO: This next statement needs to happen before this library loads
-  ;; (System/setProperty "jna.library.path" "ext")
+   [f]
+   ;; TODO: This next statement needs to happen before this library loads
+   ;; (System/setProperty "jna.library.path" "ext")
 
-  ;; And this one should live somewhere else entirely
-  ;;(import 'interception.InterceptionLibrary)
-  
-  (let [ctx (.interception_create_context InterceptionLibrary/INSTANCE)]
-    (try
-      (.interception_set_filter
-       InterceptionLibrary/INSTANCE
-       ctx
-       (reify interception.InterceptionLibrary$InterceptionPredicate
-         (apply [_ device]
-           (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
-       (short -1))
-      (loop []
-        (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
-              stroke (interception.InterceptionKeyStroke$ByReference.)
-              received (.interception_receive
-                        InterceptionLibrary/INSTANCE
-                        ctx
-                        device
-                        stroke
-                        1)]
+   ;; And this one should live somewhere else entirely
+   ;;(import 'interception.InterceptionLibrary)
 
-          (when (< 0 received)
-            ;; TODO: figure out how this should work - what function
-            ;; should call what other function? Should there be a
-            ;; trampoline involved?
-            ;; (println "raw code:" (.code stroke) "raw state:" (.state stroke))
-            (let [state (.state stroke)
-                  direction (if (bit-test state 0) :up :dn)
-                  e0 (when (bit-test state 1) :e0)
-                  e1 (when (bit-test state 2) :e1)
-                  key-index (filter identity [(.code stroke) e0 e1])
-                  key (get kchordr.keycodes/keycodes key-index (.code stroke))
-                  result (.invoke f (->event key direction))]
-              ;; For now, just always send on the keystrokes
-              (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
-              (when result
-                (recur))))))
-      (finally
-       (.interception_destroy_context InterceptionLibrary/INSTANCE ctx)))))
+   (let [ctx (.interception_create_context InterceptionLibrary/INSTANCE)]
+     (try
+       (.interception_set_filter
+        InterceptionLibrary/INSTANCE
+        ctx
+        (reify interception.InterceptionLibrary$InterceptionPredicate
+          (apply [_ device]
+            (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
+        (short -1))
+       (loop []
+         (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
+               stroke (interception.InterceptionKeyStroke$ByReference.)
+               received (.interception_receive
+                         InterceptionLibrary/INSTANCE
+                         ctx
+                         device
+                         stroke
+                         1)]
+
+           (when (< 0 received)
+             ;; TODO: figure out how this should work - what function
+             ;; should call what other function? Should there be a
+             ;; trampoline involved?
+             ;; (println "raw code:" (.code stroke) "raw state:" (.state stroke))
+             (let [state (.state stroke)
+                   direction (if (bit-test state 0) :up :dn)
+                   e0 (when (bit-test state 1) :e0)
+                   e1 (when (bit-test state 2) :e1)
+                   key-index (filter identity [(.code stroke) e0 e1])
+                   key (get kchordr.keycodes/keycodes key-index (.code stroke))
+                   result (.invoke f (->event key direction))]
+               ;; For now, just always send on the keystrokes
+               (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
+               (when result
+                 (recur))))))
+       (finally
+        (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))))

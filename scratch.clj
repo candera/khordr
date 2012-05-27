@@ -133,3 +133,67 @@ process: state, evt -> state
 (kchordr.core/intercept #'handle-event)
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(handle-keys (base-state {}) {:key :a :direction :dn})
+
+(def state (base-state {}))
+(def state (update-key-positions state :a :dn))
+(def state (maybe-add-handler (base-state {}) :a :dn))
+(process (first (:handlers state)) :a :dn)
+(def results (map #(process % :a :dn) (:handlers state)))
+(def results (take-while :continue results))
+(filter identity (map :handler results))
+(mapcat :effects results)
+state
+
+handle-keys
+
+(let [_ (println "--------------------")
+      state (base-state {})
+      event {:key :a :direction :dn}
+      {:keys [key direction]} event
+      _ (println "With update-key-positions: " state)
+      state (maybe-add-handler state key direction)
+      _ (println "Key direction: " key direction)
+      state (update-key-positions state key direction)
+      _ (println "With maybe-add-handler state:" state)
+      ;; Walk the handler chain, dealing with the results at each step
+      results (map #(process % key direction) (:handlers state))
+      results (take-while :continue results)]
+  (assoc state
+    :handlers (filter identity (map :handler results))
+    :effects (mapcat :effects results)))
+
+(maybe-add-handler {:handlers [] :positions {:a :dn}} :a :dn)
+
+(is-down? (base-state {}) :a)
+
+(update-in {:handlers [] :positions {:a :dn}} [:handlers] concat [:foo])
+
+(class (update-key-positions (base-state {}) :a :dn))
+(class (base-state {}))
+
+default-key-behaviors
+
+(base-state default-key-behaviors)
+
+(map (juxt :key :direction)) (:effects (handle-keys (base-state default-key-behaviors) {:key :b :direction :dn}))
+
+;; [[:j :dn] [:x :dn] [:x :up] [:j :up]]
+
+(-> (base-state default-key-behaviors)
+    (handle-keys (->event :j :dn))
+    (handle-keys (->event :x :dn))
+    (handle-keys (->event :x :up))
+    #_(handle-keys (->event :j :up)))
+
+(def state (-> (base-state default-key-behaviors)
+               (handle-keys (->event :j :dn))))
+
+state
+(def h (first (:handlers state)))
+h
+(def results (map #(process % :j :up) [h]))
+results
+(satisfies? IKeyHandler h)

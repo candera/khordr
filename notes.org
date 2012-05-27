@@ -44,6 +44,69 @@ ModifierAliasKeyHandler would, at self-down, go into an undecided
 state. If an other-down happened before a self-up, then it could
 transition to a decided state, and send its aliased down event.
 
+And after further thought, I wonder whether there might not be a
+better way. The responsibilities would be split between the app and
+key handlers. The app would be responsible for knowing which keys are
+down and which are up. These would be maintained in an ordered list,
+with the keys that went down first being first. Each key would have an
+associated handler (perhaps an implementation of the IKeyHandler
+protocol), a new instance of which would be created for each key that
+goes down. IKeyHandler/process would be called for each key press,
+including the one that corresponds to the creation of the handler. The
+method would accept the key event and would return a map. The map
+would have the following keys:
+
+| :handler  | a new handler object to represent the updated state of this handler. Returning nil would remove the handler from the handler list. |
+| :continue | false if no further handlers should be called; true to continue processing.                                                        |
+| :events   | a vector of key events to generate. Events from all handlers will be concatenated.                                                 |
+
+So the application's job would be to watch for key events. When a key
+goes from up to down, a new handler would be instantiated and added to
+the handler list. For all key events, process would be called and the
+result examined. The handler would be updated based on the value
+of :handler, events from :events would be accumulated, and processing
+would continue or not based on the value of :continue.
+
+There are at least three implementations of IKeyHandler: one for
+regular keys, one for modifiers alias, and one for special action
+keys.
+
+The regular key handler would be very simple. It would return a map
+whose :handler was itself unless the key was going up, in which
+case :handler would be nil. :continue would always be true. :events
+would simply be whatever event was being handled if it was for the
+self key, and nil otherwise.
+
+The modifier alias handler would initially send no keys and continue
+processing. On the next non-self key down event it saw, it would send
+the modifier and enter a decided state, unless the next event was self
+up, in which case it would send self down, self up and remove itself
+from the handler list. Once decided, it would always send the modifier
+for self down events and remove itself on self up.
+
+The special action handler would be for things like quitting the
+application or suspending key processing. For this we'd probably need
+to modify :events to be something more like :commands. Then it could
+be a sequence of tuples like [:keys [:a :dn :a :up] :suspend
+true :mouse [:left 200]].
+
+How do we leverage multimethods or protocols to make all this work? It
+seems like we ought to be able to dispatch off of the key to look up
+the key handler, although perhaps all we need there is a record class,
+so we can call new on it, passing the key as an argument.
+
+Maybe what we have is a map, like this:
+
+#+begin_src clojure
+  {:j [->ModifierAliasHandler :rshift]
+   :q [->SpecialActionHandler]}
+#+end_src
+
+That is, a map that associates keys with a tuple whose first element
+is a function that returns an implementation of IKeyHandler given a
+key and any other elements of the tuple. Failing an entry, an instance
+of DefaultHandler is used.
+
 *** Questions
 **** How to send events?
 Maybe we'd pass a function to self/other-up/down that could be called

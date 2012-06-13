@@ -1,6 +1,6 @@
-(ns kchordr.test.kchordr
+(ns khordr.test.khordr
   (:refer-clojure :exclude (send))
-  (:require [kchordr :refer (handle-keys make-modifier-alias base-state)])
+  (:require [khordr :refer (handle-keys make-modifier-alias base-state)])
   (:use [clojure.test]))
 
 (def test-key-behaviors

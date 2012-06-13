@@ -1,5 +1,5 @@
-(ns kchordr.test.keycodes
-  (:use kchordr.keycodes
+(ns khordr.test.keycodes
+  (:use khordr.keycodes
         clojure.test))
 
 ;; (deftest keycode-tests

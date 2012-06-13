@@ -8,3 +8,5 @@
 /lib
 /classes
 /target
+/.lein-plugins/
+

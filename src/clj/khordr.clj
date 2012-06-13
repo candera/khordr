@@ -1,7 +1,7 @@
-(ns kchordr
+(ns khordr
   (:refer-clojure :exclude [key send])
   (:use [clojure.core.match :only (match)]
-        kchordr.keycodes)
+        khordr.keycodes)
   ;; (:import interception.InterceptionLibrary)
   )
 
@@ -220,7 +220,7 @@
                    e0 (when (bit-test state 1) :e0)
                    e1 (when (bit-test state 2) :e1)
                    key-index (filter identity [(.code stroke) e0 e1])
-                   key (get kchordr.keycodes/keycodes key-index (.code stroke))
+                   key (get khordr.keycodes/keycodes key-index (.code stroke))
                    result (.invoke f (->event key direction))]
                ;; For now, just always send on the keystrokes
                (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)

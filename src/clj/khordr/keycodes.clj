@@ -1,4 +1,4 @@
-(ns kchordr.keycodes)
+(ns khordr.keycodes)
 
 (def keycodes
   {[1]   :esc

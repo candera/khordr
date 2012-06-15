@@ -85,15 +85,33 @@
   (->ModifierAliasKeyHandler key alias :undecided))
 
 (defrecord SpecialActionKeyHandler [self-key]
-  ;; TODO: Implement IKeyHandler
-  )
+  IKeyHandler
+  (process [this key direction]
+    (merge {:continue false}
+           (match [key direction]
+
+                  [self-key :up]
+                  {:handler nil
+                   :effects [:key [self-key :dn] :key [self-key :up]]}
+
+                  [:q :dn]
+                  {:handler this
+                   :effects [:quit nil]}
+
+                  [_ _]
+                  {:handler this}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def ^{:doc "Map of keys to behaviors. Absence from this list means it's a regular key."}
   default-key-behaviors
   {:j [make-modifier-alias :rshift]
-   :k [make-modifier-alias :rcontrol]})
+   :k [make-modifier-alias :rcontrol]
+   :l [make-modifier-alias :ralt]
+   :f [make-modifier-alias :lshift]
+   :d [make-modifier-alias :lcontrol]
+   :s [make-modifier-alias :lalt]
+   :backtick [(fn [key] (SpecialActionKeyHandler. key))]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Key events

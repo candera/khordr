@@ -1,11 +1,15 @@
 (ns khordr.test.khordr
   (:refer-clojure :exclude (send))
-  (:require [khordr :refer (handle-keys make-modifier-alias base-state)])
-  (:use [clojure.test]))
+  (:require [khordr :refer (handle-keys
+                            make-modifier-alias
+                            base-state)])
+  (:use [clojure.test])
+  (:import khordr.SpecialActionKeyHandler))
 
 (def test-key-behaviors
   {:j [make-modifier-alias :rshift]
-   :k [make-modifier-alias :rcontrol]})
+   :k [make-modifier-alias :rcontrol]
+   :backtick [(fn [self-key] (SpecialActionKeyHandler. self-key))]})
 
 (defn- sent
   "Given a sequence of key events, return the sequence of keys that
@@ -96,8 +100,7 @@
        [[:backtick :dn] [:backtick :up] [:q :dn] [:backtick :dn]]
        [:key [:backtick :dn]
         :key [:backtick :up]
-        :key [:q :dn]
-        :key [:backtick :dn]]
+        :key [:q :dn]]
 
        ;; TODO: Also move towards using key maps to describe keys even on output
        ))

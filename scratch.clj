@@ -197,3 +197,15 @@ h
 (def results (map #(process % :j :up) [h]))
 results
 (satisfies? IKeyHandler h)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(use 'khordr)
+(use 'clojure.repl)
+(use 'clojure.pprint)
+
+(-> (base-state default-key-behaviors)
+    (handle-keys (->event :backtick :dn))
+    :handlers
+    first
+    (process :q :dn))

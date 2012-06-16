@@ -1,9 +1,6 @@
 (ns khordr
   (:refer-clojure :exclude [key send])
-  (:use [clojure.core.match :only (match)]
-        khordr.keycodes)
-  ;; (:import interception.InterceptionLibrary)
-  )
+  (:require [khordr.platform.common :as com]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -16,7 +13,7 @@
 ;;
 
 (defprotocol IKeyHandler
-  (process [this key direction]
+  (process [this keyevent]
     "Process a key event, returning a map. The map should contain the
      following keys: :handler - either an implementation of
      IKeyHandler representing the updated state of this handler or
@@ -27,56 +24,68 @@
 
 (defrecord DefaultKeyHandler [self-key]
   IKeyHandler
-  (process [this key direction]
-    (if (= key (:self-key this))
-      {:handler (when (= direction :dn) this)
-       :continue true
-       :effects [:key [key direction]]}
-      {:handler this
-       :effects []
-       :continue true})))
+  (process [this keyevent]
+    (let [{:keys [key direction]} keyevent]
+     (if (= key (:self-key this))
+       {:handler (when (= direction :dn) this)
+        :continue true
+        :effects [{:effect :key :event keyevent}]}
+       {:handler this
+        :effects []
+        :continue true}))))
 
 
 (defrecord ModifierAliasKeyHandler [self-key alias state]
   IKeyHandler
-  (process [this key direction]
-    (match [state (if (= key self-key) :self :other) direction]
+  (process [this keyevent]
+    (let [{:keys [key direction]} keyevent
+          which (if (= key self-key) :self :other)]
+      (println "key=" key "direction=" direction "which=" which "state=" state)
+      ;; It's a bummer, but we can't use core.match because of AOT.
+      ;; The code was somewhat prettier with it. Maybe we can switch
+      ;; back when core.match matures.
+      (cond
+       ;; If we're undecided and we see another self-down,
+       ;; continue waiting.
+       (and (= state :undecided) (= which :self) (= direction :dn))
+       {:handler this
+        :continue true}
 
-           ;; If we're undecided and we see another self-down,
-           ;; continue waiting.
-           [:undecided :self :dn]
-           {:handler this
-            :continue true}
+       ;; If we're undecided and we see an other-down, then we
+       ;; know that we're going to be aliasing, so we change state
+       ;; and send the alias down.
+       (and (= state :undecided) (= which :other) (= direction :dn))
+       {:handler (ModifierAliasKeyHandler. self-key alias :aliasing)
+        :effects [{:effect :key
+                   :event (assoc keyevent :key alias :direction :dn)}]
+        :continue true}
 
-           ;; If we're undecided and we see an other-down, then we
-           ;; know that we're going to be aliasing, so we change state
-           ;; and send the alias down.
-           [:undecided :other :dn]
-           {:handler (ModifierAliasKeyHandler. self-key alias :aliasing)
-            :effects [:key [alias :dn]]
-            :continue true}
+       ;; If we're undecided and we see a self-up, then we're not
+       ;; aliasing, so we can just send self-down and self-up.
+       (and (= state :undecided) (= which :self) (= direction :up))
+       (do
+         (println "self-up")
+         {:handler nil
+          :effects [{:effect :key
+                     :event (assoc keyevent :key self-key :direction :dn)}
+                    {:effect :key
+                     :event (assoc keyevent :key self-key :direction :up)}]
+          :continue true})
 
-           ;; If we're undecided and we see a self-up, then we're not
-           ;; aliasing, so we can just send self-down and self-up.
-           [:undecided :self :up]
-           {:handler nil
-            :effects [:key [self-key :dn] :key [self-key :up]]
-            :continue true}
+       ;; If we're aliasing and we see a self-down or a self-up,
+       ;; then we can just send the alias, removing ourselves from
+       ;; the chain if it's an up
+       (and (= state :aliasing) (= which :self))
+       {:handler (when (= direction :dn) this)
+        :effects [{:effect :key :event (assoc keyevent :key alias)}]
+        :continue true}
 
-           ;; If we're aliasing and we see a self-down or a self-up,
-           ;; then we can just send the alias, removing ourselves from
-           ;; the chain if it's an up
-           [:aliasing :self _]
-           {:handler (when (= direction :dn) this)
-            :effects [:key [alias direction]]
-            :continue true}
-
-           ;; Otherwise, we don't change anything
-           [_ _ _]
-           {:handler this
-            :effects []
-            :continue true}
-           )))
+       ;; Otherwise, we don't change anything
+       :else
+       {:handler this
+        :effects []
+        :continue true})
+      )))
 
 (defn make-modifier-alias
   "Helper function to create a ModifierAliasKeyHandler in its initial
@@ -86,20 +95,26 @@
 
 (defrecord SpecialActionKeyHandler [self-key]
   IKeyHandler
-  (process [this key direction]
-    (merge {:continue false}
-           (match [key direction]
+  (process [this keyevent]
+    (let [{:keys [key direction]} keyevent]
+      (println key direction)
+      (merge {:continue false}
+             (cond
+              ;;[key direction]
 
-                  [self-key :up]
-                  {:handler nil
-                   :effects [:key [self-key :dn] :key [self-key :up]]}
+              (and (= key self-key) (= direction :up))
+              {:handler nil
+               :effects [{:effect :key
+                          :event (assoc keyevent :key self-key :direction :dn)}
+                         {:effect :key
+                          :event (assoc keyevent :key self-key :direction :up)}]}
 
-                  [:q :dn]
-                  {:handler this
-                   :effects [:quit nil]}
+              (and (= key :q) (= direction :dn))
+              {:handler this
+               :effects [{:effect :quit}]}
 
-                  [_ _]
-                  {:handler this}))))
+              :else
+              {:handler this})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -111,22 +126,7 @@
    :f [make-modifier-alias :lshift]
    :d [make-modifier-alias :lcontrol]
    :s [make-modifier-alias :lalt]
-   :backtick [(fn [key] (SpecialActionKeyHandler. key))]})
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Key events
-
-(defn ->event
-  "Given a key name and a direction, either as individual arguments or
-  as a two-element sequence, return a new key event."
-  ([[key direction]] (->event key direction))
-  ([key direction] {:key key :direction direction}))
-
-(defn append
-  "Append bs to a, where bs and a are (potentially empty) sequences of
-  events."
-  [a & bs]
-  (concat a bs))
+   :backtick [->SpecialActionKeyHandler]})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -155,33 +155,38 @@
 (defn maybe-add-handler
   "Return a state value that has been updated to include any necessary
   new key handlers."
-  [state key direction]
+  [state keyevent]
   ;; Is this a key down event? If not, return the state unchanged. If
   ;; so, is the key already down? If not, create a handler and add it
   ;; to the end of the chain. If so, return the state unchanged.
-  (if (and (= direction :dn)
-           (not (is-down? state key)))
-    (update-in state [:handlers] concat [(handler state key)])
-    state))
+  (let [{:keys [key direction]} keyevent]
+    (if (and (= direction :dn)
+             (not (is-down? state key)))
+      (update-in state [:handlers] concat [(handler state key)])
+      state)))
 
 (defn update-key-positions
   "Return a state that has been updated to reflect which keys are up
   and which are down."
-  [state key direction]
-  (assoc-in state [:positions key] direction))
+  [state keyevent]
+  (let [{:keys [key direction]} keyevent]
+   (assoc-in state [:positions key] direction)))
 
 (defn handle-keys
   "Given the current state and a key event, return an updated state."
-  [state event]
-  (let [{:keys [key direction]} event
+  [state keyevent]
+  ;; It turns out to be important to preserve other keys in the
+  ;; keyevent, because they contain platform-specific stuff like the
+  ;; keyboard the event arrived on.
+  (let [{:keys [key direction]} keyevent
         ;; Important! Don't update the positions until after we add
         ;; the new handler, since whether or not we add one depends on
         ;; whether a key is already down.
-        state (maybe-add-handler state key direction)
-        state (update-key-positions state key direction)
+        state (maybe-add-handler state keyevent)
+        state (update-key-positions state keyevent)
         ;; Walk the handler chain, dealing with the results at each step
         handlers (:handlers state)
-        results (map #(process % key direction) handlers)
+        results (map #(process % keyevent) handlers)
         ;; If one of the handlers prevents processing from continuing,
         ;; we don't take any subsequent effects into consideration,
         ;; but we do let the handlers update themselves based on the
@@ -193,6 +198,34 @@
     (-> state
         (assoc-in [:handlers] (filter identity (map :handler results)))
         (update-in [:effects] concat effects))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Effects handling
+;;
+
+(defmulti enact
+  "Extension point for effects produced by handlers."
+  (fn [effect state platform] (:effect effect)))
+
+(defmethod enact :key
+  [effect state platform]
+  (com/send-key platform (:event effect))
+  state)
+
+(defmethod enact :quit
+  [_ state _ _]
+  (assoc state :done true))
+
+(defn enact-effects!
+  "Given the state, enact any pending effects and return a new state."
+  [state platform]
+  (loop [state state
+         [effect & more] (:effects state)]
+    (if effect
+      (let [state (enact effect state platform)]
+        (recur state more))
+      (dissoc state :effects))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

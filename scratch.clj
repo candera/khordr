@@ -16,7 +16,7 @@
          (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
      (short -1))
 
-    (dotimes [n 50]
+    (dotimes [n 0]
       (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
             stroke (interception.InterceptionKeyStroke$ByReference.)
             received (.interception_receive
@@ -205,7 +205,27 @@ results
 (use 'clojure.pprint)
 
 (-> (base-state default-key-behaviors)
-    (handle-keys (->event :backtick :dn))
+    (handle-keys {:key :backtick :direction :dn})
+    :handlers
+    first)
+
+(-> (base-state default-key-behaviors)
+    (handle-keys {:key :backtick :direction :dn})
     :handlers
     first
-    (process :q :dn))
+    (process {:key :q :direction :dn}))
+
+(-> (base-state default-key-behaviors)
+    (handle-keys {:key :j :direction :dn})
+    :effects)
+
+(-> (khordr.SpecialActionKeyHandler. :backtick)
+    (process {:key :q :direction :dn}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(-> (base-state default-key-behaviors)
+    (handle-keys {:key :j :direction :dn})
+    :handlers
+    first
+    (process {:key :x :direction :dn}))

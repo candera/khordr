@@ -2,7 +2,8 @@
   (:refer-clojure :exclude (send))
   (:require [khordr :refer (handle-keys
                             make-modifier-alias
-                            base-state)])
+                            base-state
+                            enact-effects!)])
   (:use [clojure.test])
   (:import khordr.SpecialActionKeyHandler))
 
@@ -23,9 +24,13 @@
   [[key direction]]
   {:key key :direction direction})
 
+(defn- ->key-effect
+  [[key direction]]
+  {:effect :key :event {:key key :direction direction}})
+
 (defn- press
-  "Given a seq of pairs of [key direction], return the sent keys as a
-  similar seq."
+  "Given a seq of pairs of [key direction], return a seq of
+  corresponding key effects."
   [pressed]
   (sent (map ->event pressed)))
 
@@ -37,11 +42,11 @@
        (= anticipated (press pressed))
        ;; Single regular key press
        [[:b :dn]]
-       [:key [:b :dn]]
+       [(->key-effect [:b :dn])]
 
        ;; Single regular key press and release
        [[:b :dn] [:b :up]]
-       [:key [:b :dn] :key [:b :up]]
+       [(->key-effect [:b :dn]) (->key-effect [:b :up])]
 
        ;; Modifier alias press only
        [[:j :dn]]
@@ -49,59 +54,82 @@
 
        ;; Modifier alias press and release
        [[:j :dn] [:j :up]]
-       [:key [:j :dn] :key [:j :up]]
+       [(->key-effect [:j :dn]) (->key-effect [:j :up])]
 
        ;; Modifier alias repeat and release
        [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
-       [:key [:j :dn] :key [:j :up]]
+       [(->key-effect [:j :dn]) (->key-effect [:j :up])]
 
        ;; Modifier alias with regular key press
        [[:j :dn] [:x :dn]]
-       [:key [:rshift :dn] :key [:x :dn]]
+       [(->key-effect [:rshift :dn]) (->key-effect [:x :dn])]
 
        ;; Modifier alias with regular key press and release
        [[:j :dn] [:x :dn] [:x :up] [:j :up]]
-       [:key [:rshift :dn] :key [:x :dn] :key [:x :up] :key [:rshift :up]]
+       [(->key-effect [:rshift :dn])
+        (->key-effect [:x :dn])
+        (->key-effect [:x :up])
+        (->key-effect [:rshift :up])]
 
        ;; Modifier alias with regular key press and release followed
        ;; by modifier alias press and release
        [[:j :dn] [:x :dn] [:x :up] [:j :up] [:j :dn] [:j :up]]
-       [:key [:rshift :dn]
-        :key [:x :dn]
-        :key [:x :up]
-        :key [:rshift :up]
-        :key [:j :dn]
-        :key [:j :up]]
+       [(->key-effect [:rshift :dn])
+        (->key-effect [:x :dn])
+        (->key-effect [:x :up])
+        (->key-effect [:rshift :up])
+        (->key-effect [:j :dn])
+        (->key-effect [:j :up])]
 
        ;; Multiple modifier aliases down sends the first modifier
        [[:j :dn] [:k :dn]]
-       [:key [:rshift :dn]]
+       [(->key-effect [:rshift :dn])]
 
        ;; Multiple modifier aliases down followed by regular key down
        ;; adds both modifiers to regular key
        [[:j :dn] [:k :dn] [:x :dn]]
-       [:key [:rshift :dn] :key [:rcontrol :dn] :key [:x :dn]]
+       [(->key-effect [:rshift :dn])
+        (->key-effect [:rcontrol :dn])
+        (->key-effect [:x :dn])]
 
        ;; Order of modifier aliases down is preserved? (TODO: Is this
        ;; what we want?)
        [[:k :dn] [:j :dn] [:x :dn]]
-       [:key [:rcontrol :dn] :key [:rshift :dn] :key [:x :dn]]
+       [(->key-effect [:rcontrol :dn])
+        (->key-effect [:rshift :dn])
+        (->key-effect [:x :dn])]
 
        ;; A modifier alias going up when another modifier is undecided
        ;; means the second modifier was a regular keypress.
        [[:j :dn] [:k :dn] [:k :up]]
-       [:key [:rshift :dn] :key [:k :dn] :key [:k :up]]
+       [(->key-effect [:rshift :dn])
+        (->key-effect [:k :dn])
+        (->key-effect [:k :up])]
 
        ;; We have the ability to quit the application
        [[:backtick :dn] [:q :dn]]
-       [:quit nil]
+       [{:effect :quit}]
 
        ;; But other nearby key sequences don't quit
        [[:backtick :dn] [:backtick :up] [:q :dn] [:backtick :dn]]
-       [:key [:backtick :dn]
-        :key [:backtick :up]
-        :key [:q :dn]]
+       [(->key-effect [:backtick :dn])
+        (->key-effect [:backtick :up])
+        (->key-effect [:q :dn])]
 
        ;; TODO: Also move towards using key maps to describe keys even on output
        ))
 
+(deftest enact
+  (let [sent-keys (atom [])
+        platform (reify khordr.platform.common.IPlatform
+                   (await-key-event [this])
+                   (send-key [this keyevent]
+                     (swap! sent-keys concat [keyevent])))]
+    (is (= {} (enact-effects! {:effects []} platform)))
+    (enact-effects! {:effects [{:effect :key
+                                :event {:key :a :direction :dn}}
+                               {:effect :key
+                                :event {:key :a :direction :up}}]}
+                    platform)
+    (is (= @sent-keys [{:key :a :direction :dn}
+                       {:key :a :direction :up}]))))

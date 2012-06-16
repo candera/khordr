@@ -132,4 +132,5 @@
                                 :event {:key :a :direction :up}}]}
                     platform)
     (is (= @sent-keys [{:key :a :direction :dn}
-                       {:key :a :direction :up}]))))
+                       {:key :a :direction :up}]))
+    (is (:done (enact-effects! {:effects [{:effect :quit}]} platform)))))

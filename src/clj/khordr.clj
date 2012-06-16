@@ -214,7 +214,7 @@
   state)
 
 (defmethod enact :quit
-  [_ state _ _]
+  [_ state _]
   (assoc state :done true))
 
 (defn enact-effects!

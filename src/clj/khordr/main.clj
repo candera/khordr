@@ -7,9 +7,12 @@
   "Main entry point for the application."
   [& args]
   (let [platform (p/initialize)]
-   (loop [state (k/base-state k/default-key-behaviors)]
-     (let [event (com/await-key-event platform)
-           state (k/handle-keys state event)
-           state (k/enact-effects! state platform)]
-       (when-not (:done state)
-         (recur state))))))
+    (try
+     (loop [state (k/base-state k/default-key-behaviors)]
+       (let [event (com/await-key-event platform)
+             state (k/handle-keys state event)
+             state (k/enact-effects! state platform)]
+         (when-not (:done state)
+           (recur state))))
+     (finally
+      (com/cleanup platform)))))

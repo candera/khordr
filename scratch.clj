@@ -6,7 +6,9 @@
 ;; context = Interception.CreateContext();
 (System/setProperty "jna.library.path" "ext")
 (import 'interception.InterceptionLibrary)
+(require '[khordr.platform.windows :as win])
 (let [ctx (.interception_create_context InterceptionLibrary/INSTANCE)]
+  (println "ctx" ctx)
   (try
     (.interception_set_filter
      InterceptionLibrary/INSTANCE
@@ -16,33 +18,47 @@
          (.interception_is_keyboard InterceptionLibrary/INSTANCE device)))
      (short -1))
 
-    (dotimes [n 0]
-      (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
-            stroke (interception.InterceptionKeyStroke$ByReference.)
-            received (.interception_receive
-                      InterceptionLibrary/INSTANCE
-                      ctx
-                      device
-                      stroke
-                      1)]
+    (println "filter set")
 
-        (when (< 0 received)
-          (println "received:" received (.code stroke) (.state stroke))
-          ;; (when (= 0x15 (.code stroke))
-          ;;   (set! (.code stroke) 0x2d))
-          (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1)
-          ;; If it's a y, send an additional x
-          (when (= 0x15 (.code stroke))
-            (set! (.code stroke) 0x2d)
-            (.interception_send InterceptionLibrary/INSTANCE ctx device stroke 1))
-          ;;  // Hitting escape terminates the program
-          ;;  if (stroke.key.code == ScanCode.Escape)
-          (if (= 0x01 (.code stroke))
-            (println "quitting")
-            ;(recur)
-            ))))
+    (loop [n 20]
+      (when (pos? n)
+        (let [device (.interception_wait InterceptionLibrary/INSTANCE ctx)
+              _ (println "device" device)
+              stroke (interception.InterceptionKeyStroke$ByReference.)
+              _ (println "stroke" stroke)
+              received (.interception_receive
+                        InterceptionLibrary/INSTANCE
+                        ctx
+                        device
+                        stroke
+                        1)
+              _ (println "received" received)]
+
+          (when (< 0 received)
+            (println "received:" received (.code stroke) (.state stroke))
+            ;; (when (= 0x15 (.code stroke))
+            ;;   (set! (.code stroke) 0x2d))
+            (println "sending" stroke "on device" device)
+            (.interception_send InterceptionLibrary/INSTANCE
+                                ctx
+                                device
+                                stroke
+                                1)
+            ;; If it's a y, send an additional x
+            (when (= 0x15 (.code stroke))
+              (let [direction (if (bit-test (.state stroke) 0) :up :dn)
+                    new-stroke (win/event->stroke {:key :x :direction direction :device 2})]
+                (println "sending extra x")
+                (.interception_send InterceptionLibrary/INSTANCE ctx device new-stroke 1)))
+            ;;  // Hitting escape terminates the program
+            ;;  if (stroke.key.code == ScanCode.Escape)
+            (if (= 0x01 (.code stroke))
+              (println "quitting")
+              (recur (dec n))
+              )))))
     (finally
-     (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))
+     (.interception_destroy_context InterceptionLibrary/INSTANCE ctx)
+     (println "done"))))
 
 
 ;;  {
@@ -229,3 +245,36 @@ results
     :handlers
     first
     (process {:key :x :direction :dn}))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(require :reload '[khordr.platform.common :as com])
+(require :reload '[khordr.platform :as p])
+(require :reload '[khordr.platform.windows :as win])
+
+(let [p (win/initialize)]
+  (loop [limit 50]
+    (when (pos? limit)
+      (let [evt (com/await-key-event p)]
+        (println "received" evt)
+        (when (not= :esc (:key evt))
+          (com/send-key p (assoc evt :key (if (= :x (:key evt)) :y (:key evt))))
+          (recur (dec limit))))))
+  (com/cleanup p)
+  (println "done!"))
+
+(require :reload '[khordr.platform.common :as com])
+(require :reload '[khordr.platform :as p])
+(require :reload '[khordr.platform.windows :as win])
+
+(let [p (p/initialize)
+      evt (com/await-key-event p)
+      ]
+  (println "operating on platform " p)
+  (println "received" evt)
+  (com/send-key p evt)
+  (com/cleanup p)
+  (println)
+  (println "after cleanup, event is" evt)
+  evt
+)

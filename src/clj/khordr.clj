@@ -5,6 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn no-op [& args])
+;; (def log println)
 (def log no-op)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -40,7 +41,7 @@
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent
           which (if (= key self-key) :self :other)]
-      (println "key=" key "direction=" direction "which=" which "state=" state)
+      (log "key=" key "direction=" direction "which=" which "state=" state)
       ;; It's a bummer, but we can't use core.match because of AOT.
       ;; The code was somewhat prettier with it. Maybe we can switch
       ;; back when core.match matures.
@@ -64,7 +65,7 @@
        ;; aliasing, so we can just send self-down and self-up.
        (and (= state :undecided) (= which :self) (= direction :up))
        (do
-         (println "self-up")
+         (log "self-up")
          {:handler nil
           :effects [{:effect :key
                      :event (assoc keyevent :key self-key :direction :dn)}

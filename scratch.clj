@@ -277,4 +277,211 @@ results
   (println)
   (println "after cleanup, event is" evt)
   evt
-)
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Print out what keys are up and what keys are down
+
+(require :reload '[khordr.platform.common :as com])
+(require :reload '[khordr.platform :as p])
+(require '[clojure.string :as str])
+
+(defn char+ [c n]
+  (str (char (+ n (int c)))))
+
+(def letters (map #(char+ \a %) (range 0 26)))
+(def numbers (map #(char+ \0 %) (range 0 10)))
+(def alphanumerics (concat letters numbers))
+
+(def keymap
+  (merge {:space "_"
+          :lshift "#"
+          :rshift "#"
+          :lcontrol "^"
+          :rcontrol "^"
+          :capslock "$"                 ; Control on my system
+          :lalt "@"
+          :ralt "@"
+          :quote "'"
+          :semicolon ";"
+          :enter "!"}
+         (zipmap (map keyword alphanumerics) alphanumerics)))
+
+;; This one shows a sort of moving graph of what keys are down
+(let [platform (p/initialize)]
+  (try
+    (loop [key-str ""]
+      (let [{:keys [key direction] :as event} (com/await-key-event platform)]
+        ;;(println key direction)
+        (when-not (= :esc key)
+          (com/send-key platform event)
+          (let [k (get keymap key)
+                new-key-str (if-not k
+                          key-str
+                          (if (= direction :dn)
+                            (if (.contains key-str k)
+                              key-str
+                              (.concat key-str k))
+                            (.replace key-str k " ")))]
+            (when-not (= key-str new-key-str)
+              (println new-key-str)
+              (flush))
+            (recur (if (str/blank? new-key-str) "" new-key-str))))))
+    (finally
+     (println "Done!")
+     (com/cleanup platform))))
+
+;; This one collects keys for later analysis
+(require '[clojure.pprint :as pp])
+
+
+;;; Analysis
+(use 'khordr.analysis)
+
+(count @events)
+
+;; Frequency of key pressed
+(let [down-events (filter #(= :dn (:direction %)) @events)
+      n (count down-events)]
+  (->> down-events
+       (reduce (fn [acc evt]
+             (update-in acc [(:key evt)] (fnil inc 0)))
+               {})
+       (map (fn [[k c]] [k (float (/ c n))]))
+       (sort-by second)
+       reverse
+       (take 10)
+       pp/pprint))
+
+;; Simultaneous key-downs
+
+(->> (key-downs @events)
+     (filter #(< 2 (count %)))
+     (filter (contains-fn :space))
+     (filter #(not= :space (last %)))
+     distinct
+     )
+
+(->> (key-downs @events)
+     (map (comp vec distinct))
+     (filter #(< 2 (count %)))
+     (filter (contains-fn :space))
+     distinct
+     (group-by (fn [e] (count (take-while (fn [x] (not= x :space)) e))))
+     (#(get % 2))
+     (filter #(< 2 (count %)))
+     )
+
+;; Show me all the events that have multiple keys down after space goes down
+(->> (key-downs @events)
+     (map (comp vec distinct))
+     (filter multiple-after-space?)
+     distinct
+     )
+
+(count (distinct (key-downs @events)))
+
+
+;; OK, so sometimes there are multiple keys down after space goes
+;; down. But do they come up in reverse order? Or in FIFO order?
+(->> (key-downs @events)
+     (map #(if (only-space? %) [:repeat-spaces] %))
+     (drop-while (complement multiple-after-space?))
+     (drop 1)
+     (drop-while (complement multiple-after-space?))
+     (drop 1)
+     (drop-while (complement multiple-after-space?))
+     (drop 1)
+     (drop-while (complement multiple-after-space?))
+     (drop 100)
+     (drop-while (complement multiple-after-space?))     
+     (drop 1)
+     (drop-while (complement multiple-after-space?))
+     (take 10))
+([:space :t :h] [:t :h] [:h] [:h :i] [:i] [:i :s] [:s] [:s :space] [:repeat-spaces] [])`q
+([:space :e :m] [:e :m] [:m] [:m :a] [:a] [:a :i] [:a] [] [:l] [:l :space])
+([:space :t :h] [:t :h] [:h] [:h :a] [:a] [:a :t] [:t] [] [:period] [])
+([:space :t :h] [:t :h] [:h] [:h :a] [:a] [:a :t] [:t] [:t :comma] [:comma] [:comma :space])
+([:space :t :h] [:t :h] [:h] [:h :e] [:e] [] [:r] [:r :e] [:e] [:e :quote])
+
+
+;; TODO: Figure out what query I need to do to tell me if
+;; modifier-press, regular-press, regular-release, modifier-release
+;; ever appears in normal usage. Also compare with usage of normal
+;; modifier keys.
+
+
+(count (chords (take 100000 (cycle [{:key :j :direction :dn}
+                                    {:key :j :direction :up}
+                                    {:key :k :direction :dn}
+                                    {:key :x :direction :dn}
+                                    {:key :x :direciton :up}
+                                    {:key :k :direction :up}
+                                    ]))))
+
+(->> @events
+     (take 10)
+     chords
+     (filter #(> 2 (count %)))
+     count)
+(take 10 @events)
+
+
+(spit "C:/temp/keys.txt" [:a :bunch :of :data])
+
+(spit "C:/temp/keys.txt" '({:key :x, :direction :up}
+          {:key :rcontrol, :direction :up}
+          {:key :ralt, :direction :up}
+          {:key :rcontrol, :direction :dn} {:key :x, :direction :dn}
+          {:key :rcontrol, :direction :up} {:key :x, :direction :up}
+          {:key :o, :direction :dn} {:key :o, :direction :up}
+          {:key :rshift, :direction :dn}))
+
+;; Load them from disk
+(require '[clojure.java.io :as io])
+
+
+(count @events)
+
+(take 10 events)
+(chords '({:key :x, :direction :up}
+          {:key :rcontrol, :direction :up}
+          ;; {:key :ralt, :direction :up} ; WTF?
+          ;; {:key :rcontrol, :direction :dn}
+          ;; {:key :x, :direction :dn}
+          ;; {:key :rcontrol, :direction :up}
+          ;; {:key :x, :direction :up}
+          ;; {:key :o, :direction :dn}
+          ;; {:key :o, :direction :up}
+          ;; {:key :rshift, :direction :dn}
+          ))
+
+(require '[clojure.pprint :as pp])
+
+(reset! events [])
+(load! "C:/temp/keys.clj")
+(count @events)
+
+
+;; How many true two-chords are there?
+(->> @events
+     chords
+     ;;(filter true-3chord?)
+     (filter true-2chord?)
+     ;; (filter (fn [chord] (not (modifier? (first chord)))))
+     ;; (filter (fn [chord] (= :space (:key (first chord)))))
+     ;; (filter #(homerow? (first %)))
+     (filter (fn [[{:keys [key]}]] (#{:s :d :f :j :k :l} key)))
+     ;; count 
+     ;;(take 10)
+     pp/pprint
+     )
+
+
+(homerow? {:key :a :direction :dn})
+
+(use :reload 'khordr.analysis)
+
+(count @events)
+(collect)

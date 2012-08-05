@@ -467,15 +467,15 @@ results
 ;; How many true two-chords are there?
 (->> @events
      chords
-     ;;(filter true-3chord?)
+     ;; (filter true-3chord?)
      (filter true-2chord?)
-     ;; (filter (fn [chord] (not (modifier? (first chord)))))
+     (filter (fn [chord] (not (modifier? (first chord)))))
      ;; (filter (fn [chord] (= :space (:key (first chord)))))
      ;; (filter #(homerow? (first %)))
      (filter (fn [[{:keys [key]}]] (#{:s :d :f :j :k :l} key)))
      ;; count 
      ;;(take 10)
-     pp/pprint
+      pp/pprint
      )
 
 
@@ -484,4 +484,6 @@ results
 (use :reload 'khordr.analysis)
 
 (count @events)
+(count (key-downs @events))
+(save! "C:/temp/keys3.clj")
 (collect)

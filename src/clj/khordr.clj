@@ -18,22 +18,18 @@
     "Process a key event, returning a map. The map should contain the
      following keys: :handler - either an implementation of
      IKeyHandler representing the updated state of this handler or
-     nil, indicating that the handler should be removed from the
-     handler list; :effects - a seq of commands legal for consumption
-     by `engine`; :continue - true if the event should be passed to
-     later handlers in the chain."))
+     nil, indicating that the handler should be deactivated; :effects
+     - a seq of commands legal for consumption by `engine`."))
 
+;; Pass through key events, and remove yourself when self-key goes up.
 (defrecord DefaultKeyHandler [self-key]
   IKeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]
-     (if (= key (:self-key this))
-       {:handler (when (= direction :dn) this)
-        :continue true
-        :effects [{:effect :key :event keyevent}]}
-       {:handler this
-        :effects []
-        :continue true}))))
+      {:handler (when-not (and (= direction :up)
+                               (= key (:self-key this)))
+                  this)
+       :effects [{:effect :key :event keyevent}]})))
 
 
 (defrecord ModifierAliasKeyHandler [self-key alias state]
@@ -49,8 +45,7 @@
        ;; If we're undecided and we see another self-down,
        ;; continue waiting.
        (and (= state :undecided) (= which :self) (= direction :dn))
-       {:handler this
-        :continue true}
+       {:handler this}
 
        ;; If we're undecided and we see an other-down, then we
        ;; know that we're going to be aliasing, so we change state
@@ -58,8 +53,7 @@
        (and (= state :undecided) (= which :other) (= direction :dn))
        {:handler (ModifierAliasKeyHandler. self-key alias :aliasing)
         :effects [{:effect :key
-                   :event (assoc keyevent :key alias :direction :dn)}]
-        :continue true}
+                   :event (assoc keyevent :key alias :direction :dn)}]}
 
        ;; If we're undecided and we see a self-up, then we're not
        ;; aliasing, so we can just send self-down and self-up.
@@ -70,22 +64,19 @@
           :effects [{:effect :key
                      :event (assoc keyevent :key self-key :direction :dn)}
                     {:effect :key
-                     :event (assoc keyevent :key self-key :direction :up)}]
-          :continue true})
+                     :event (assoc keyevent :key self-key :direction :up)}]})
 
        ;; If we're aliasing and we see a self-down or a self-up,
        ;; then we can just send the alias, removing ourselves from
        ;; the chain if it's an up
        (and (= state :aliasing) (= which :self))
        {:handler (when (= direction :dn) this)
-        :effects [{:effect :key :event (assoc keyevent :key alias)}]
-        :continue true}
+        :effects [{:effect :key :event (assoc keyevent :key alias)}]}
 
        ;; Otherwise, we don't change anything
        :else
        {:handler this
-        :effects []
-        :continue true})
+        :effects []})
       )))
 
 (defn make-modifier-alias
@@ -99,23 +90,22 @@
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]
       (println key direction)
-      (merge {:continue false}
-             (cond
-              ;;[key direction]
+      (cond
+       ;;[key direction]
 
-              (and (= key self-key) (= direction :up))
-              {:handler nil
-               :effects [{:effect :key
-                          :event (assoc keyevent :key self-key :direction :dn)}
-                         {:effect :key
-                          :event (assoc keyevent :key self-key :direction :up)}]}
+       (and (= key self-key) (= direction :up))
+       {:handler nil
+        :effects [{:effect :key
+                   :event (assoc keyevent :key self-key :direction :dn)}
+                  {:effect :key
+                   :event (assoc keyevent :key self-key :direction :up)}]}
 
-              (and (= key :q) (= direction :dn))
-              {:handler this
-               :effects [{:effect :quit}]}
+       (and (= key :q) (= direction :dn))
+       {:handler this
+        :effects [{:effect :quit}]}
 
-              :else
-              {:handler this})))))
+       :else
+       {:handler this}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -138,7 +128,7 @@
   engine."
   [behaviors]
   {:behaviors behaviors
-   :handlers []
+   :handler nil
    :positions {}})
 
 (defn is-down?
@@ -155,16 +145,18 @@
 
 (defn maybe-add-handler
   "Return a state value that has been updated to include any necessary
-  new key handlers."
+  new key handler."
   [state keyevent]
-  ;; Is this a key down event? If not, return the state unchanged. If
-  ;; so, is the key already down? If not, create a handler and add it
-  ;; to the end of the chain. If so, return the state unchanged.
-  (let [{:keys [key direction]} keyevent]
-    (if (and (= direction :dn)
-             (not (is-down? state key)))
-      (update-in state [:handlers] concat [(handler state key)])
-      state)))
+  ;; If there's already a handler, don't do anything.
+  (if (:handler state)
+    state
+    ;; Is this a key down event? If not, return the state unchanged. If
+    ;; so, is the key already down? If not, create a handler and add it
+    ;; to the end of the chain. If so, return the state unchanged.
+    (let [{:keys [key direction]} keyevent]
+      (if (= direction :dn)
+        (assoc state :handler (handler state key))
+        state))))
 
 (defn update-key-positions
   "Return a state that has been updated to reflect which keys are up
@@ -181,24 +173,16 @@
   ;; keyboard the event arrived on.
   (let [{:keys [key direction]} keyevent
         ;; Important! Don't update the positions until after we add
-        ;; the new handler, since whether or not we add one depends on
-        ;; whether a key is already down.
+        ;; the new handler, since whether or not we add one might
+        ;; depend on whether a key is already down.
         state (maybe-add-handler state keyevent)
         state (update-key-positions state keyevent)
         ;; Walk the handler chain, dealing with the results at each step
-        handlers (:handlers state)
-        results (map #(process % keyevent) handlers)
-        ;; If one of the handlers prevents processing from continuing,
-        ;; we don't take any subsequent effects into consideration,
-        ;; but we do let the handlers update themselves based on the
-        ;; key event. We may need to revisit this in the future for
-        ;; more complex scenarios, perhaps by making :continue provide
-        ;; an enumerated value, rather than just a boolean.
-        continue-count (count (take-while :continue results))
-        effects (mapcat :effects (take (inc continue-count) results))]
+        handler (:handler state)
+        results (process handler keyevent)]
     (-> state
-        (assoc-in [:handlers] (filter identity (map :handler results)))
-        (update-in [:effects] concat effects))))
+        (assoc :handler (:handler results))
+        (update-in [:effects] concat (:effects results)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

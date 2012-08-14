@@ -16,10 +16,13 @@
 (defprotocol IKeyHandler
   (process [this keyevent]
     "Process a key event, returning a map. The map should contain the
-     following keys: :handler - either an implementation of
-     IKeyHandler representing the updated state of this handler or
-     nil, indicating that the handler should be deactivated; :effects
-     - a seq of commands legal for consumption by `engine`."))
+  following keys:
+
+  :handler - either an implementation of IKeyHandler representing the
+  updated state of this handler or nil, indicating that the handler
+  should be deactivated;
+
+  :effects - a seq of commands legal for consumption by `engine`."))
 
 ;; Pass through key events, and remove yourself when self-key goes up.
 (defrecord DefaultKeyHandler [self-key]
@@ -109,15 +112,28 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def ^{:doc "Map of keys to behaviors. Absence from this list means it's a regular key."}
-  default-key-behaviors
-  {:j [make-modifier-alias :rshift]
-   :k [make-modifier-alias :rcontrol]
-   :l [make-modifier-alias :ralt]
-   :f [make-modifier-alias :lshift]
-   :d [make-modifier-alias :lcontrol]
-   :s [make-modifier-alias :lalt]
-   :backtick [->SpecialActionKeyHandler]})
+
+;; A sequence of pairs: a selector and a handler specifier. The
+;; selector is a function of one argument that will be invoked with a
+;; key name (e.g. :a). If the selector returns true, the first element
+;; of the specifier is invoked with the matched key and any remaining
+;; elements of the selector.
+
+;; TODO: Consider special-casing keywords as a selectors, and consider
+;; passing the selector to the handler specifier. In general, the DSL
+;; here needs to be more fleshed-out once we use it as a serialization
+;; format.
+(let [right-modifiers {:j :rshift
+                       :k :rcontrol
+                       :l :ralt}
+      left-modifiers  {:f :lshift
+                       :d :lcontrol
+                       :s :lalt}]
+  (def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
+    default-key-behaviors
+    {right-modifiers [make-modifier-alias right-modifiers]
+     left-modifiers [make-modifier-alias left-modifiers]
+     #(= % :backtick) [->SpecialActionKeyHandler]}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -136,11 +152,28 @@
   [state key]
   (= :dn (get-in state [:positions key])))
 
+(defn handler-match
+  "Given a key and a handler matcher-specifier pair, return the pair if
+  the matcher matches the key, and nil otherwise."
+  [key [matcher specifier]]
+  (when (matcher key)
+    [matcher specifier]))
+
+(defn handler-specifier
+  "Given behaviors and a key, return the first handler specifier that
+  matches, or nil if no matches are found."
+  [behaviors key]
+  (->> behaviors
+       (partition 2)
+       (filter (partial handler-match key))
+       first
+       second))
+
 (defn handler
   "Return a new handler for the specified key."
   [state key]
   (let [[make-handler & params]
-        (get (:behaviors state) key [->DefaultKeyHandler])]
+        (or (handler-specifier (:behaviors state) key)) [->DefaultKeyHandler]]
     (apply make-handler key params)))
 
 (defn maybe-add-handler

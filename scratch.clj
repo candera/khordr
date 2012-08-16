@@ -487,3 +487,48 @@ results
 (count (key-downs @events))
 (save! "C:/temp/keys3.clj")
 (collect)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(khordr.test.khordr/valid-events #{:a :b} 1)
+
+(reduce conj (mapcat (partial khordr.test.khordr/valid-events #{:j :k :x}) (range 1 5)))
+
+(khordr.test.khordr/valid-events #{:a :b} 2)
+
+(in-ns 'khordr.test.khordr)
+
+(valid? [{:key :x :direction :dn}])
+
+(all-events #{:x} 1)
+
+
+(cross-prod [:a :b] [:c :d])
+
+(use 'khordr)
+
+(-> default-key-behaviors
+    base-state
+    (handler :j))
+
+(handler-specifier default-key-behaviors :x)
+
+(->> default-key-behaviors
+     (partition 2)
+     first
+     first
+     )
+
+(-> default-key-behaviors
+    base-state
+    (handle-keys {:key :backtick :direction :dn})
+    (handle-keys {:key :q :direction :dn})
+    :effects)
+
+(-> default-key-behaviors
+    base-state
+    (handle-keys {:key :backtick :direction :dn})
+    (handle-keys {:key :backtick :direction :up})
+    (handle-keys {:key :q :direction :dn})
+    (handle-keys {:key :backtick :direction :dn})
+)

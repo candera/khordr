@@ -35,67 +35,183 @@
        :effects [{:effect :key :event keyevent}]})))
 
 
-(defrecord ModifierAliasKeyHandler [self-key alias state]
+(defn conj-if-missing
+  "Returns coll with elem conj'd on, but only if coll does not already
+  contain elem."
+  [coll elem]
+  (if (some #(= elem %) coll)
+    coll
+    (conj coll elem)))
+
+(defn key-effect
+  "Creates a key effect given a keyevent template, a key, and a direction."
+  [template key direction]
+  {:effect :key :event (assoc template :key key :direction direction)})
+
+(defrecord ModifierAliasKeyHandler [down-modifiers pending-keys aliases state]
   IKeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent
-          which (if (= key self-key) :self :other)]
-      (log "key=" key "direction=" direction "which=" which "state=" state)
+          modifier? (contains? aliases key)
+          up? (= direction :up)
+          down? (not up?)]
+
       ;; It's a bummer, but we can't use core.match because of AOT.
       ;; The code was somewhat prettier with it. Maybe we can switch
       ;; back when core.match matures.
-      (cond
-       ;; If we're undecided and we see another self-down,
-       ;; continue waiting.
-       (and (= state :undecided) (= which :self) (= direction :dn))
-       {:handler this}
+      (case state
 
-       ;; If we're undecided and we see an other-down, then we
-       ;; know that we're going to be aliasing, so we change state
-       ;; and send the alias down.
-       (and (= state :undecided) (= which :other) (= direction :dn))
-       {:handler (ModifierAliasKeyHandler. self-key alias :aliasing)
-        :effects [{:effect :key
-                   :event (assoc keyevent :key alias :direction :dn)}]}
+        ;; Initial: we start here. The very next thing to happen
+        ;; should be that we get the key down that activated this
+        ;; handler.
+        :initial
+        (if (and modifier? down?)
+          {:handler
+           (ModifierAliasKeyHandler.
+            (conj down-modifiers key)
+            pending-keys
+            aliases
+            :armed)}
+          (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
+                          {:keyevent keyevent
+                           :reason :weird-state
+                           :source this})))
 
-       ;; If we're undecided and we see a self-up, then we're not
-       ;; aliasing, so we can just send self-down and self-up.
-       (and (= state :undecided) (= which :self) (= direction :up))
-       (do
-         (log "self-up")
+        ;; Armed: the first state of the handler after the initial
+        ;; keypress. Means that we're ready to alias if necessary, but
+        ;; we can't tell yet if the user is just typing a regular key
+        ;; or really does want to try to alias a modifier
+        :armed
+        (cond
+         (and modifier? down?)
+         (if (= [key] down-modifiers)
+           {:handler this}              ; It's a repeat
+           {:handler (ModifierAliasKeyHandler.
+                     (conj-if-missing down-modifiers key)
+                     pending-keys
+                     aliases
+                     :multi-armed)})
+
+         (and modifier? up?)
          {:handler nil
-          :effects [{:effect :key
-                     :event (assoc keyevent :key self-key :direction :dn)}
-                    {:effect :key
-                     :event (assoc keyevent :key self-key :direction :up)}]})
+          :effects [(key-effect keyevent key :dn)
+                    (key-effect keyevent key :up)]}
 
-       ;; If we're aliasing and we see a self-down or a self-up,
-       ;; then we can just send the alias, removing ourselves from
-       ;; the chain if it's an up
-       (and (= state :aliasing) (= which :self))
-       {:handler (when (= direction :dn) this)
-        :effects [{:effect :key :event (assoc keyevent :key alias)}]}
+         (and (not modifier?) down?)
+         {:handler (ModifierAliasKeyHandler.
+                    down-modifiers
+                    (conj pending-keys key)
+                    aliases
+                    :deciding)}
 
-       ;; Otherwise, we don't change anything
-       :else
-       {:handler this
-        :effects []})
-      )))
+         :else
+         (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was armed: " keyevent)
+                         {:keyevent keyevent
+                          :reason :weird-state
+                          :source this})))
+
+        ;; Multi-armed: The user has simultaneously pressed more than
+        ;; one modifier alias. We're not sure what to do yet, since
+        ;; they might release them all or go on to press a regular key
+        ;; they want to modify.
+        :multi-armed
+        (cond
+         (and modifier? down?)
+         {:handler (ModifierAliasKeyHandler.
+                    (conj-if-missing down-modifiers key)
+                    pending-keys
+                    aliases
+                    :multi-armed)}
+
+         (and modifier? up?)
+         (let [new-down-modifiers (filterv #(not= modifier? %)
+                                           down-modifiers)]
+           (if (seq new-down-modifiers)
+             {:handler (ModifierAliasKeyHandler.
+                        new-down-modifiers
+                        pending-keys
+                        aliases
+                        :multi-armed)}
+             {:handler nil}))
+
+         (and (not modifier?) down?)
+         {:handler (ModifierAliasKeyHandler.
+                    down-modifiers
+                    []
+                    aliases
+                    :aliasing)
+          :effects (conj
+                    (mapv #(key-effect keyevent % :dn)
+                          (map aliases down-modifiers))
+                    (key-effect keyevent key :dn))}
+
+         :else
+         (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was multi-armed: " keyevent)
+                         {:keyevent keyevent
+                          :reason :weird-state
+                          :source this})))
+
+        ;; Deciding: The user might be trying to alias: we'll know for
+        ;; sure if the next thing that happens is a regular key down.
+        ;; Otherwise, it was probably just multiple accidental
+        ;; simultaneous key presses.
+        :deciding
+        (cond
+         (and (not modifier?) down?)
+         {:handler (ModifierAliasKeyHandler.
+                    down-modifiers
+                    (conj pending-keys key)
+                    aliases
+                    :deciding)}
+
+         (and (not modifier?) up?)
+         {:handler (ModifierAliasKeyHandler.
+                    []
+                    []
+                    aliases
+                    :aliasing)
+          :effects (concat (map #(key-effect keyevent % :dn) (map aliases down-modifiers))
+                           (map #(key-effect keyevent % :dn) pending-keys)
+                           [(key-effect keyevent key :up)])}
+
+         modifier?
+         {:handler nil
+          :effects (concat (map #(key-effect keyevent % :dn) down-modifiers)
+                           (map #(key-effect keyevent % :dn) pending-keys)
+                           [(key-effect keyevent modifier? direction)])})
+
+        ;; Aliasing: we're treating modifiers as their aliases, until
+        ;; the last one goes up
+        :aliasing
+        (let [new-down-modifiers
+              (cond
+               (and modifier? down?)
+               (conj-if-missing down-modifiers key)
+
+               (and modifier? up?)
+               (filterv #(not= modifier? %) down-modifiers)
+
+               :else
+               down-modifiers)]
+          {:handler (when (seq new-down-modifiers)
+                      (ModifierAliasKeyHandler.
+                       new-down-modifiers
+                       nil
+                       aliases
+                       :aliasing))
+           :effects [(key-effect keyevent (get aliases key key) direction)]})))))
 
 (defn make-modifier-alias
   "Helper function to create a ModifierAliasKeyHandler in its initial
   state."
-  [key alias]
-  (->ModifierAliasKeyHandler key alias :undecided))
+  [key aliases]
+  (->ModifierAliasKeyHandler [] [] aliases :initial))
 
 (defrecord SpecialActionKeyHandler [self-key]
   IKeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]
-      (println key direction)
       (cond
-       ;;[key direction]
-
        (and (= key self-key) (= direction :up))
        {:handler nil
         :effects [{:effect :key
@@ -117,7 +233,8 @@
 ;; selector is a function of one argument that will be invoked with a
 ;; key name (e.g. :a). If the selector returns true, the first element
 ;; of the specifier is invoked with the matched key and any remaining
-;; elements of the selector.
+;; elements of the selector. As a special case, the selector may be a
+;; keyword, which matches only itself.
 
 ;; TODO: Consider special-casing keywords as a selectors, and consider
 ;; passing the selector to the handler specifier. In general, the DSL
@@ -131,9 +248,9 @@
                        :s :lalt}]
   (def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
     default-key-behaviors
-    {right-modifiers [make-modifier-alias right-modifiers]
+    [right-modifiers [make-modifier-alias right-modifiers]
      left-modifiers [make-modifier-alias left-modifiers]
-     #(= % :backtick) [->SpecialActionKeyHandler]}))
+     :backtick [->SpecialActionKeyHandler]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -152,11 +269,22 @@
   [state key]
   (= :dn (get-in state [:positions key])))
 
+(defprotocol HandlerMatch
+  (match? [matcher key]
+    "Return true if this handler matches this key."))
+
+(extend-protocol HandlerMatch
+  clojure.lang.Keyword
+  (match? [k key] (= k key))
+
+  clojure.lang.IFn
+  (match? [f key] (f key)))
+
 (defn handler-match
   "Given a key and a handler matcher-specifier pair, return the pair if
   the matcher matches the key, and nil otherwise."
   [key [matcher specifier]]
-  (when (matcher key)
+  (when (match? matcher key)
     [matcher specifier]))
 
 (defn handler-specifier
@@ -173,7 +301,7 @@
   "Return a new handler for the specified key."
   [state key]
   (let [[make-handler & params]
-        (or (handler-specifier (:behaviors state) key)) [->DefaultKeyHandler]]
+        (or (handler-specifier (:behaviors state) key) [->DefaultKeyHandler])]
     (apply make-handler key params)))
 
 (defn maybe-add-handler

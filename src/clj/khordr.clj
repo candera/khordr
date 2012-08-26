@@ -1,12 +1,7 @@
 (ns khordr
   (:refer-clojure :exclude [key send])
-  (:require [khordr.platform.common :as com]))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn no-op [& args])
-;; (def log println)
-(def log no-op)
+  (:require [khordr.platform.common :as com]
+            [khordr.logging :as log]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -24,7 +19,8 @@
 
   :effects - a seq of commands legal for consumption by `engine`."))
 
-;; Pass through key events, and remove yourself when self-key goes up.
+;; The default implementation: pass through key events unchanged.
+;; yourself when self-key goes up.
 (defrecord DefaultKeyHandler [self-key]
   IKeyHandler
   (process [this keyevent]
@@ -34,6 +30,16 @@
                   this)
        :effects [{:effect :key :event keyevent}]})))
 
+;; And if we're not tracking any keys (as can happen if the first
+;; event is a key up), just pass through the events unchanged. The
+;; reason we want both this and DefaultKeyHandler is that
+;; DefaultKeyHandler will prevent any other key down event from
+;; activating a handler.
+(extend-protocol IKeyHandler
+  nil
+  (process [_ keyevent]
+    {:handler nil
+     :effects [{:effect :key :event keyevent}]}))
 
 (defn conj-if-missing
   "Returns coll with elem conj'd on, but only if coll does not already
@@ -166,7 +172,7 @@
 
          (and (not modifier?) up?)
          {:handler (ModifierAliasKeyHandler.
-                    []
+                    down-modifiers
                     []
                     aliases
                     :aliasing)
@@ -178,7 +184,7 @@
          {:handler nil
           :effects (concat (map #(key-effect keyevent % :dn) down-modifiers)
                            (map #(key-effect keyevent % :dn) pending-keys)
-                           [(key-effect keyevent modifier? direction)])})
+                           [(key-effect keyevent key direction)])})
 
         ;; Aliasing: we're treating modifiers as their aliases, until
         ;; the last one goes up
@@ -189,7 +195,7 @@
                (conj-if-missing down-modifiers key)
 
                (and modifier? up?)
-               (filterv #(not= modifier? %) down-modifiers)
+               (filterv #(not= key %) down-modifiers)
 
                :else
                down-modifiers)]
@@ -304,6 +310,11 @@
         (or (handler-specifier (:behaviors state) key) [->DefaultKeyHandler])]
     (apply make-handler key params)))
 
+(defn all-up?
+  "Return true if no keys are currently in the down state."
+  [state]
+  (not (some (fn [[k v]] (= v :dn)) (:positions state))))
+
 (defn maybe-add-handler
   "Return a state value that has been updated to include any necessary
   new key handler."
@@ -314,8 +325,9 @@
     ;; Is this a key down event? If not, return the state unchanged. If
     ;; so, is the key already down? If not, create a handler and add it
     ;; to the end of the chain. If so, return the state unchanged.
+    ;; Also, don't add a handler unless all the other keys are up.
     (let [{:keys [key direction]} keyevent]
-      (if (= direction :dn)
+      (if (and (= direction :dn) (all-up? state))
         (assoc state :handler (handler state key))
         state))))
 
@@ -333,6 +345,8 @@
   ;; keyevent, because they contain platform-specific stuff like the
   ;; keyboard the event arrived on.
   (let [{:keys [key direction]} keyevent
+        _ (log/debug (:handler state))
+        _ (log/debug keyevent)
         ;; Important! Don't update the positions until after we add
         ;; the new handler, since whether or not we add one might
         ;; depend on whether a key is already down.
@@ -341,6 +355,8 @@
         ;; Walk the handler chain, dealing with the results at each step
         handler (:handler state)
         results (process handler keyevent)]
+    (log/debug results)
+    (log/debug "----------")
     (-> state
         (assoc :handler (:handler results))
         (update-in [:effects] concat (:effects results)))))

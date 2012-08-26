@@ -1,13 +1,9 @@
 (ns khordr.platform.windows
   "Implement IPlatform for Windows"
   (:require [khordr.platform.common :as c]
+            [khordr.logging :as log]
             [clojure.set :as set])
   (:import interception.InterceptionLibrary))
-
-(defn noop [& args])
-
-;;(def log println)
-(def log noop)
 
 (def keycodes
   {{:code 1}   :esc
@@ -175,16 +171,16 @@
 (defrecord WindowsPlatform [context]
   c/IPlatform
   (await-key-event [this]
-    (log "awaiting key event for " context)
+    (log/debug "awaiting key event for " context)
     (let [[stroke device] (receive-stroke context)]
       (when stroke
         (stroke->event stroke device))))
   (send-key [this keyevent]
-    (log "sending key" keyevent "on" this)
+    (log/debug "sending key" keyevent "on" this)
     (if-let [device (:device keyevent)]
       (let [stroke (event->stroke keyevent)]
-        (log "translated event:" stroke)
-        (log "sending stroke" stroke "on device" device "in context" context)
+        ;; (log/debug "translated event:" stroke)
+        ;; (log/debug "sending stroke" stroke "on device" device "in context" context)
         (.interception_send InterceptionLibrary/INSTANCE
                             context
                             device

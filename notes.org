@@ -147,3 +147,7 @@ net.java.dev.jna/jna. Maybe a conflict with the jnaerator-runtime
 dependency? Either way, it looks like I really need to figure out a
 way to have alternative setups in the project.clj, since I wind up
 switching back and forth a lot.
+** Bugs in current version
+*** FIXED Typing "test" quickly does not work
+*** FIXED We get trapped in the ModifierKeyAlias sometimes
+*** FIXED We get weird state state exception from ModifierKeyAlias sometimes

@@ -151,3 +151,14 @@ switching back and forth a lot.
 *** FIXED Typing "test" quickly does not work
 *** FIXED We get trapped in the ModifierKeyAlias sometimes
 *** FIXED We get weird state state exception from ModifierKeyAlias sometimes
+*** INHERENT Key events are not received?
+s-down, d-down, p-down, p-up, n-down: No events appear to arrive for
+n. Is this a problem at the hardware level? Somewhere else? Sure looks
+like it's happening at the hardware level. :(
+
+OK, yep. Most keyboards are limited on how many down events they can
+report. And USB keyboards are limited to six regardless. It appears to
+depend entirely on the keyboard, although they can all do at least
+two. The fix here is to by a keyboard that supports n-key rollover
+(NKRO). I'm using a dasKeyboard brand, and it seems to work just fine.
+

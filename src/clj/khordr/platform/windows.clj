@@ -171,12 +171,12 @@
 (defrecord WindowsPlatform [context]
   c/IPlatform
   (await-key-event [this]
-    (log/debug "awaiting key event for " context)
+    ;; (log/debug "awaiting key event for " context)
     (let [[stroke device] (receive-stroke context)]
       (when stroke
         (stroke->event stroke device))))
   (send-key [this keyevent]
-    (log/debug "sending key" keyevent "on" this)
+    ;;(log/debug "sending key" keyevent "on" this)
     (if-let [device (:device keyevent)]
       (let [stroke (event->stroke keyevent)]
         ;; (log/debug "translated event:" stroke)

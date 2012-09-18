@@ -229,6 +229,10 @@
        {:handler this
         :effects [{:effect :quit}]}
 
+       (and (= key :l) (= direction :dn))
+       {:handler this
+        :effects [{:effect :cycle-log}]}
+
        :else
        {:handler this}))))
 
@@ -378,6 +382,25 @@
 (defmethod enact :quit
   [_ state _]
   (assoc state :done true))
+
+(defmethod enact :cycle-log
+  [_ state _]
+  (case (log/log-level)
+    :debug
+    (do
+      (log/set-log-level! :info)
+      (println "Log level set to INFO"))
+
+    :info
+    (do
+      (log/set-log-level! :error)
+      (println "Log level set to ERROR"))
+
+    :error
+    (do
+      (log/set-log-level! :debug)
+      (println "Log level set to DEBUG")))
+  state)
 
 (defn enact-effects!
   "Given the state, enact any pending effects and return a new state."

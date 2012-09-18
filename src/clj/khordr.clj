@@ -6,8 +6,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Behaviors 
-
 ;; Behaviors: a sequence of pairs, each of which is a selector and a
 ;; handler specifier. The selector is a function of one argument that
 ;; will be invoked with a key name (e.g. :a). If the selector returns
@@ -161,6 +159,25 @@
 (defmethod enact :quit
   [_ state _]
   (assoc state :done true))
+
+(defmethod enact :cycle-log
+  [_ state _]
+  (case (log/log-level)
+    :debug
+    (do
+      (log/set-log-level! :info)
+      (println "Log level set to INFO"))
+
+    :info
+    (do
+      (log/set-log-level! :error)
+      (println "Log level set to ERROR"))
+
+    :error
+    (do
+      (log/set-log-level! :debug)
+      (println "Log level set to DEBUG")))
+  state)
 
 (defn enact-effects!
   "Given the state, enact any pending effects and return a new state."

@@ -7,33 +7,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Behaviors 
-
-;; Behaviors: a sequence of pairs, each of which is a selector and a
-;; handler specifier. The selector is a function of one argument that
-;; will be invoked with a key name (e.g. :a). If the selector returns
-;; true, the first element of the specifier is invoked with the result
-;; of calling the selector. As a special case, the selector may be a
-;; keyword, which matches only itself.
-
-;; TODO: the DSL here needs to be more fleshed-out once we use it as a
-;; serialization format.
+;;
+;; A behavior is a map with keys `:match` and `:handler`. The :match
+;; dictates how the handler is selected. If it is a map, it can have
+;; the keys `:key` (and, at some point in the future, `:direction`),
+;; which must match the keyevent map that is passed in.
 
 (defn map-selector
   "Given a map m, return the whole map if the key k appears in it."
   [m k]
   (when (m k) m))
 
-(let [right-modifiers {:j :rshift
-                       :k :rcontrol
-                       :l :ralt}
-      left-modifiers  {:f :lshift
-                       :d :lcontrol
-                       :s :lalt}]
-  (def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
-    default-key-behaviors
-    [#(map-selector right-modifiers %) 'khordr.handler.modifier-alias/Initial
-     #(map-selector left-modifiers %) 'khordr.handler.modifier-alias/Initial
-     :backtick 'khordr.handler.special-action/SpecialActionKeyHandler]))
+(def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
+  default-key-behaviors
+  '[{:match {:key #{:j :k :l}}
+     :handler (khordr.handler.modifier_alias/Initial {:j :rshift :k :rcontrol :l :ralt})}
+    {:match {:key #{:f :d :s}}
+     :handler (khordr.handler.modifier_alias/Initial {:f :lshift :d :lcontrol :s :lalt})}
+    {:match {:key :backtick}
+     :handler khordr.handler.special_action/SpecialActionKeyHandler}])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -81,22 +73,17 @@
        (filter (partial handler-match key))
        first))
 
-(defn make-handler
-  "Given the result of a calling a selector function and a handler
-  specifier, return an instance of IKeyHandler."
-  [specifier selector-result]
-  (let [ns (ns-name specifier)]))
+(defn handler-match
+  "Return an instance of the handler specified by `behavior` if it
+  matches `keyevent`"
+  [behavior keyevent]
+  )
 
 (defn handler
-  "Return a new handler for the specified key."
-  [state key]
-  (let [[result specifier] (handler-specifier (:behaviors state) key)]
-    (make-handler specifier result)))
-
-(defn all-up?
-  "Return true if no keys are currently in the down state."
-  [state]
-  (not (some (fn [[k v]] (= v :dn)) (:positions state))))
+  "Using `behaviors` return a handler that matches `keyevent` or nil if
+  none match."
+  [behaviors keyevent]
+  (some #(handler-match % keyevent) behaviors))
 
 (defn maybe-add-handler
   "Return a state value that has been updated to include any necessary
@@ -105,14 +92,7 @@
   ;; If there's already a handler, don't do anything.
   (if (:handler state)
     state
-    ;; Is this a key down event? If not, return the state unchanged. If
-    ;; so, is the key already down? If not, create a handler and add it
-    ;; to the end of the chain. If so, return the state unchanged.
-    ;; Also, don't add a handler unless all the other keys are up.
-    (let [{:keys [key direction]} keyevent]
-      (if (and (= direction :dn) (all-up? state))
-        (assoc state :handler (handler state key))
-        state))))
+    (assoc state (handler (:behaviors state) keyevent))))
 
 (defn update-key-positions
   "Return a state that has been updated to reflect which keys are up

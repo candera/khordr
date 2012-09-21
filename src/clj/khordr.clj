@@ -6,12 +6,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Behaviors 
+;; Behaviors
 ;;
 ;; A behavior is a map with keys `:match` and `:handler`. The :match
 ;; dictates how the handler is selected. If it is a map, it can have
-;; the keys `:key` (and, at some point in the future, `:direction`),
-;; which must match the keyevent map that is passed in.
+;; the keys `:key` and/or `:direction` which must match the keyevent
+;; map that is passed in. If the value for :key or :direction is a
+;; set, any value from the set matches.
+;;
+;; The :handler must be either a symbol or a list. If a symbol, it
+;; must specify a package-qualified Java class that implements
+;; khordr.handler.IKeyHandler. If a list, the first element must be a
+;; symbol that follows the same rules. The remaining elements of the
+;; list are Clojure data that are passed to the constructor of the
+;; class.
 
 (defn map-selector
   "Given a map m, return the whole map if the key k appears in it."
@@ -39,45 +47,58 @@
    :handler nil
    :positions {}})
 
-(defn is-down?
-  "Return true if the specified key is in the down position."
-  [state key]
-  (= :dn (get-in state [:positions key])))
+;; Defines how a matcher like {:key #{:a :b} :direction :up} matches a
+;; keyevent like {:key :a :direction :dn :device 2}
+(defprotocol Matcher
+  (match? [pattern keyevent]
+    "Return true if this pattern matches this keyevent."))
 
-(defprotocol HandlerMatch
-  (match [matcher key]
-    "Return true if this handler matches this key."))
+;; Defines how an element of a matcher matches the corresponding
+;; value. E.g. how #{:a b} matches :a
+(defprotocol ElementMatcher
+  (element-match? [pattern value]
+    "Return true if this pattern matches this value."))
 
-(extend-protocol HandlerMatch
+;; Defines how a handler specifier turns into an instance of
+;; IKeyHandler
+(defprotocol HandlerFactory
+  (make-handler [specifier]))
+
+(extend-protocol HandlerFactory
+  clojure.lang.Symbol
+  (make-handler [specifier]
+    ;; TODO: Construct an instance of the class named by specifier
+    )
+
+  clojure.lang.PersistentList
+  (make-handler [specifier]
+    ;; TODO: construct an instance of the class named by (first
+    ;; specifier), passing in (rest specifier) as the constructor
+    ;; args.
+    ))
+
+(extend-protocol Matcher
+  clojure.lang.PersistentArrayMap
+  (match? [pattern keyevent]
+    (and (element-match? (:key pattern) (:key keyevent))
+         (element-match? (:direction pattern) (:direction keyevent)))))
+
+(extend-protocol ElementMatcher
+  nil
+  (element-match? [pattern value] true)
+
   clojure.lang.Keyword
-  (match [k key] (when (= k key) k))
+  (element-match? [pattern value] (= pattern value))
 
-  clojure.lang.IFn
-  (match [f key] (f key)))
-
-(defn handler-match
-  "Given a key and a handler matcher-specifier pair, return the pair if
-  the matcher matches the key, and nil otherwise."
-  [key [matcher specifier]]
-  (when-let [result (match matcher key)]
-    [result specifier]))
-
-(defn handler-specifier
-  "Given behaviors and a key, return a two-element vector, [result
-  specifier], where result is the result of calling the selector
-  function and specifier is the corresponding handler specifier.
-  Return nil if no matches are found."
-  [behaviors key]
-  (->> behaviors
-       (partition 2)
-       (filter (partial handler-match key))
-       first))
+  clojure.lang.PersistentHashSet
+  (element-match? [pattern value] (pattern value)))
 
 (defn handler-match
   "Return an instance of the handler specified by `behavior` if it
   matches `keyevent`"
   [behavior keyevent]
-  )
+  (when (match? (:match behavior) keyevent)
+    (make-handler (:handler behavior))))
 
 (defn handler
   "Using `behaviors` return a handler that matches `keyevent` or nil if

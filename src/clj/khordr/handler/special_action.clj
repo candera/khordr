@@ -3,7 +3,13 @@
   actions, such as qutting and suspending the application."
   (:require [khordr.handler :as h]))
 
-(defrecord SpecialActionKeyHandler [trigger]
+;; The first key event we get is the thing that triggered us
+(defrecord Handler []
+  h/IKeyHandler
+  (process [this keyevent]
+    {:handler (Initialized. (:key keyevent))}))
+
+(defrecord InitializedHandler [trigger]
   h/IKeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]

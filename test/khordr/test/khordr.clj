@@ -1,15 +1,17 @@
 (ns khordr.test.khordr
   (:refer-clojure :exclude (send))
   (:require [khordr :refer (handle-keys
-                            make-modifier-alias
                             base-state
+                            match?
                             enact-effects!)])
-  (:use [clojure.test])
-  (:import khordr.SpecialActionKeyHandler))
+  (:use [clojure.test]))
 
 (def test-key-behaviors
-  [#{:j :k} [make-modifier-alias {:j :rshift, :k :rcontrol}]
-   :backtick [(fn [self-key] (SpecialActionKeyHandler. self-key))]])
+  '[{:match {:key #{:j :k} :direction :dn}
+     :handler (khordr.handler.modifier_alias.Initial
+               {:j :rshift, :k :rcontrol}) }
+    {:match {:key :backtick :direction :dn}
+     :handler khordr.handler.special_action.Handler}])
 
 (defn- sent
   "Given a sequence of key events, return the sequence of keys that
@@ -226,3 +228,32 @@
     (is (= @sent-keys [{:key :a :direction :dn}
                        {:key :a :direction :up}]))
     (is (:done (enact-effects! {:effects [{:effect :quit}]} platform)))))
+
+(deftest behavior-match
+
+  ;; If the key doesn't match, it doesn't match
+  (is (not (match? {:key :a} {:key :b :direction :dn})))
+
+  ;; {:key :a} matches {:key :a} in either direction and extra entries
+  ;; make no difference
+  (is (match? {:key :a} {:key :a :direction :dn :device 2}))
+  (is (match? {:key :a} {:key :a :direction :up :device 2 :other "whatever"}))
+
+  ;; Direction matters when specified
+  (is (match? {:key :a :direction :dn} {:key :a :direction :dn :device 2}))
+  (is (not (match? {:key :a :direction :dn} {:key :a :direction :up :device 2})))
+
+  ;; We can use sets for keys
+  (is (match? {:key #{:a :b}} {:key :a :direction :dn :device 2}))
+  (is (match? {:key #{:a :b}} {:key :b :direction :up :device 2}))
+
+  ;; We can match just on direction
+  (is (match? {:direction :dn} {:key :x :direction :dn :device 2}))
+  (is (not (match? {:direction :dn} {:key :x :direction :up :device 2})))
+
+  ;; We can use sets for direction
+  (is (match? {:direction #{:up :dn}} {:key :x :direction :dn :device 2}))
+  (is (match? {:direction #{:up :dn}} {:key :x :direction :up :device 2}))
+
+  ;; An empty set doesn't match anything
+  (is (match? {:key #{}} {:key :x :direction :dn :device 2})))

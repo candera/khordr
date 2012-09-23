@@ -51,7 +51,7 @@
     ;; processing: It's a rollover situation
     (if-not (empty? (:down-keys state))
       {:handler nil
-       :effect :key :event keyevent}
+       :effects [{:effect :key :event keyevent}]}
       (let [{:keys [key direction]} keyevent
             modifier?               (contains? aliases key)
             up?                     (= direction :up)

@@ -199,6 +199,12 @@
              [:rcontrol :dn]
              [:x :dn]])
 
+       ;; Rollover keys still work
+       [[:r :dn] [:k :dn]]
+       (map key-effect
+            [[:r :dn]
+             [:k :dn]])
+
        ;; We have the ability to quit the application
        [[:backtick :dn] [:q :dn]]
        [{:effect :quit}]

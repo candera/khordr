@@ -196,6 +196,8 @@
   operating systems."
   []
   (let [context (.interception_create_context InterceptionLibrary/INSTANCE)]
+    (log/debug {:type :context-created
+                :data context})
     (.interception_set_filter
      InterceptionLibrary/INSTANCE
      context

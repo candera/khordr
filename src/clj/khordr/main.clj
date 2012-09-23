@@ -13,6 +13,8 @@
     (try
       (loop [state (k/base-state k/default-key-behaviors)]
         (let [event (com/await-key-event platform)
+              _     (log/debug {:type :key-event-received
+                                :data event})
               state (k/handle-keys state event)
               state (k/enact-effects! state platform)]
           (when-not (:done state)

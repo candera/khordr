@@ -1,12 +1,12 @@
 (ns khordr.handler
   "Defines the interface for khordr key handlers")
 
-(defprotocol IKeyHandler
+(defprotocol KeyHandler
   (process [this keyevent]
     "Process a key event, returning a map. The map should contain the
   following keys:
 
-  :handler - either an implementation of IKeyHandler representing the
+  :handler - either an implementation of KeyHandler representing the
              updated state of this handler or nil, indicating that the
              handler should be deactivated;
 
@@ -15,7 +15,7 @@
 ;; The default implementation: pass through key events unchanged.
 ;; yourself when self-key goes up.
 (defrecord DefaultKeyHandler [self-key]
-  IKeyHandler
+  KeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]
       {:handler (when-not (and (= direction :up)
@@ -28,7 +28,7 @@
 ;; reason we want both this and DefaultKeyHandler is that
 ;; DefaultKeyHandler will prevent any other key down event from
 ;; activating a handler.
-(extend-protocol IKeyHandler
+(extend-protocol KeyHandler
   nil
   (process [_ keyevent]
     {:handler nil

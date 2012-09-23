@@ -43,7 +43,7 @@
 ;; Aliasing: we're translating normal keys into modifier keys
 (defrecord Aliasing [down-modifiers pending-keys aliases])
 
-(extend-protocol h/IKeyHandler
+(extend-protocol h/KeyHandler
 
   Handler
   (process [{:keys [aliases] :as this} keyevent]

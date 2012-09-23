@@ -4,7 +4,7 @@
   (:require [khordr.handler :as h]))
 
 (defrecord InitializedHandler [trigger]
-  h/IKeyHandler
+  h/KeyHandler
   (process [this keyevent]
     (let [{:keys [key direction]} keyevent]
       (cond
@@ -24,7 +24,7 @@
 
 ;; The first key event we get is the thing that triggered us
 (defrecord Handler []
-  h/IKeyHandler
+  h/KeyHandler
   (process [this keyevent]
     {:handler (InitializedHandler. (:key keyevent))}))
 

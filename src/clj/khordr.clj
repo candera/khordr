@@ -61,7 +61,7 @@
     "Return true if this pattern matches this value."))
 
 ;; Defines how a handler specifier turns into an instance of
-;; IKeyHandler
+;; KeyHandler
 (defprotocol HandlerFactory
   (make-handler [specifier args]))
 

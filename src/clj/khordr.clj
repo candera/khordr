@@ -138,17 +138,17 @@
   ;; keyevent, because they contain platform-specific stuff like the
   ;; keyboard the event arrived on.
   (let [{:keys [key direction]} keyevent
-        _ (log/debug (:handler state))
-        _ (log/debug keyevent)
+        _ (log/debug {:type :keyevent :data keyevent})
         state (maybe-add-handler state keyevent)
+        _ (log/debug {:type :handler-updated :data (dissoc state :behaviors)})
         handler (:handler state)
         results (h/process handler state keyevent)
+        _ (log/debug {:type :handler-results :data results})
         ;; Important! Don't update the positions until after we
         ;; process the key, since the new handler might care whether
         ;; any keys are down other than the one that triggered the new
         ;; handler.
         state (update-key-positions state keyevent)]
-    (log/debug results)
     (log/debug "----------")
     (-> state
         (assoc :handler (:handler results))

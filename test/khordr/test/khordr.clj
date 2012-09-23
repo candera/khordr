@@ -8,10 +8,10 @@
 
 (def test-key-behaviors
   '[{:match {:key #{:j :k} :direction :dn}
-     :handler (khordr.handler.modifier_alias.Initial
-               {:j :rshift, :k :rcontrol}) }
+     :handler khordr.handler.modifier-alias/Handler
+     :args [{:j :rshift, :k :rcontrol}] }
     {:match {:key :backtick :direction :dn}
-     :handler khordr.handler.special_action.Handler}])
+     :handler khordr.handler.special-action/Handler}])
 
 (defn- sent
   "Given a sequence of key events, return the sequence of keys that
@@ -208,7 +208,8 @@
        [(key-effect [:backtick :dn])
         (key-effect [:backtick :up])
         (key-effect [:q :dn])
-        (key-effect [:backtick :dn])]
+        ;;(key-effect [:backtick :dn])
+        ]
 
        ;; TODO: Also move towards using key maps to describe keys even on output
        ))
@@ -256,4 +257,4 @@
   (is (match? {:direction #{:up :dn}} {:key :x :direction :up :device 2}))
 
   ;; An empty set doesn't match anything
-  (is (match? {:key #{}} {:key :x :direction :dn :device 2})))
+  (is (not (match? {:key #{}} {:key :x :direction :dn :device 2}))))

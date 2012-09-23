@@ -14,12 +14,11 @@
 ;; map that is passed in. If the value for :key or :direction is a
 ;; set, any value from the set matches.
 ;;
-;; The :handler must be either a symbol or a list. If a symbol, it
-;; must specify a package-qualified Java class that implements
-;; khordr.handler.IKeyHandler. If a list, the first element must be a
-;; symbol that follows the same rules. The remaining elements of the
-;; list are Clojure data that are passed to the constructor of the
-;; class.
+;; The :handler must be a symbol that specifies a namespace-qualified
+;; Clojure record or a package-qualified Java class (support for Java
+;; classes pending). If present, the optional `:args` entry of the
+;; behavior map specifies a vector of arguments to the class or record
+;; constructor.
 
 (defn map-selector
   "Given a map m, return the whole map if the key k appears in it."
@@ -29,11 +28,13 @@
 (def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
   default-key-behaviors
   '[{:match {:key #{:j :k :l}}
-     :handler (khordr.handler.modifier_alias/Initial {:j :rshift :k :rcontrol :l :ralt})}
+     :handler khordr.handler.modifier-alias/Handler
+     :args [{:j :rshift :k :rcontrol :l :ralt}]}
     {:match {:key #{:f :d :s}}
-     :handler (khordr.handler.modifier_alias/Initial {:f :lshift :d :lcontrol :s :lalt})}
+     :handler khordr.handler.modifier-alias/Handler
+     :args [{:f :lshift :d :lcontrol :s :lalt}]}
     {:match {:key :backtick}
-     :handler khordr.handler.special_action/SpecialActionKeyHandler}])
+     :handler khordr.handler.special-action/Handler}])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -62,20 +63,25 @@
 ;; Defines how a handler specifier turns into an instance of
 ;; IKeyHandler
 (defprotocol HandlerFactory
-  (make-handler [specifier]))
+  (make-handler [specifier args]))
+
+(defn record-constructor
+  "Given a namespaced symbol, return the constructor function for the
+  record it names."
+  [s]
+  (let [ns-name   (namespace s)
+        type-name (name s)
+        ns-symbol (symbol ns-name)
+        _         (require (symbol ns-name))
+        ctor-name (symbol (str "->" type-name))]
+    (ns-resolve (the-ns ns-symbol) ctor-name)))
 
 (extend-protocol HandlerFactory
+  ;; If namespaced, names a Clojure record type. If not, names a
+  ;; package-qualified Java class (not currently supported)
   clojure.lang.Symbol
-  (make-handler [specifier]
-    ;; TODO: Construct an instance of the class named by specifier
-    )
-
-  clojure.lang.PersistentList
-  (make-handler [specifier]
-    ;; TODO: construct an instance of the class named by (first
-    ;; specifier), passing in (rest specifier) as the constructor
-    ;; args.
-    ))
+  (make-handler [specifier args]
+    (apply (record-constructor specifier) args)))
 
 (extend-protocol Matcher
   clojure.lang.PersistentArrayMap
@@ -93,12 +99,15 @@
   clojure.lang.PersistentHashSet
   (element-match? [pattern value] (pattern value)))
 
+;; TODO: Looking up the handler every time may be sort of slow. I
+;; suspect that, if optimization is needed, some memoization in this
+;; code path will be helpful.
 (defn handler-match
   "Return an instance of the handler specified by `behavior` if it
   matches `keyevent`"
   [behavior keyevent]
   (when (match? (:match behavior) keyevent)
-    (make-handler (:handler behavior))))
+    (make-handler (:handler behavior) (:args behavior))))
 
 (defn handler
   "Using `behaviors` return a handler that matches `keyevent` or nil if
@@ -113,7 +122,7 @@
   ;; If there's already a handler, don't do anything.
   (if (:handler state)
     state
-    (assoc state (handler (:behaviors state) keyevent))))
+    (assoc state :handler (handler (:behaviors state) keyevent))))
 
 (defn update-key-positions
   "Return a state that has been updated to reflect which keys are up

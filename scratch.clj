@@ -505,7 +505,7 @@ results
 
 (cross-prod [:a :b] [:c :d])
 
-(use 'khordr)
+(use :reload 'khordr)
 
 (-> default-key-behaviors
     base-state
@@ -532,3 +532,14 @@ results
     (handle-keys {:key :q :direction :dn})
     (handle-keys {:key :backtick :direction :dn})
 )
+
+(-> default-key-behaviors
+    base-state
+    (handle-keys {:key :rshift :direction :dn})
+    (handle-keys {:key :x :direction :dn})
+    (handle-keys {:key :x :direction :up})
+    (handle-keys {:key :rshift :direction :up})
+    (handle-keys {:key :j :direction :dn})
+)
+
+

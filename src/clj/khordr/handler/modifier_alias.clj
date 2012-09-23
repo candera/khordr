@@ -17,38 +17,57 @@
   [template key direction]
   {:effect :key :event (assoc template :key key :direction direction)})
 
-;; Initial: we start here. The very next thing to happen
-;; should be that we get the key down that activated this
-;; handler.
-(defrecord Initial [aliases]
-  h/IKeyHandler
-  (process [this keyevent]
+;; Handler: we start here. The very next thing to happen should be
+;; that we get the key down that activated this handler, which pushes
+;; us into Armed.
+(defrecord Handler [aliases])
+
+;; Armed: the first state of the handler after the initial
+;; keypress. Means that we're ready to alias if necessary, but
+;; we can't tell yet if the user is just typing a regular key
+;; or really does want to try to alias a modifier.
+(defrecord Armed [trigger aliases])
+
+;; Multi-armed: The user has simultaneously pressed more than
+;; one modifier alias. We're not sure what to do yet, since
+;; they might release them all or go on to press a regular key
+;; they want to modify.
+(defrecord MultiArmed [down-modifiers pending-keys aliases])
+
+;; Deciding: The user might be trying to alias: we'll know for
+;; sure if the next thing that happens is a regular key down.
+;; Otherwise, it was probably just multiple accidental
+;; simultaneous key presses (called "rollover").
+(defrecord Deciding [down-modifiers pending-keys aliases])
+
+;; Aliasing: we're translating normal keys into modifier keys
+(defrecord Aliasing [down-modifiers pending-keys aliases])
+
+(extend-protocol h/IKeyHandler
+
+  Handler
+  (process [{:keys [aliases] :as this} keyevent]
     (let [{:keys [key direction]} keyevent
-          modifier? (contains? aliases key)
-          up? (= direction :up)
-          down? (not up?)]
+          modifier?               (contains? aliases key)
+          up?                     (= direction :up)
+          down?                   (not up?)]
 
       (if (and modifier? down?)
         {:handler (Armed. key aliases)}
         (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
                         {:keyevent keyevent
                          :reason :weird-state
-                         :source this}))))))
+                         :source this})))))
 
-;; Armed: the first state of the handler after the initial
-;; keypress. Means that we're ready to alias if necessary, but
-;; we can't tell yet if the user is just typing a regular key
-;; or really does want to try to alias a modifier
-(defrecord Armed [trigger aliases]
-  h/IKeyHandler
-  (process [this keyevent]
+  Armed
+  (process [{:keys [trigger aliases] :as this} keyevent]
     (let [{:keys [key direction]} keyevent
-          modifier? (contains? aliases key)
-          up? (= direction :up)
-          down? (not up?)]
+          modifier?               (contains? aliases key)
+          up?                     (= direction :up)
+          down?                   (not up?)]
       (cond
        (and modifier? down?)
-       (if (= [key] down-modifiers)
+       (if (= key trigger)
          {:handler this}                ; It's a repeat
          {:handler (MultiArmed. [trigger key] [] aliases)})
 
@@ -64,19 +83,14 @@
        (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was armed: " keyevent)
                        {:keyevent keyevent
                         :reason :weird-state
-                        :source this}))))))
+                        :source this})))))
 
-;; Multi-armed: The user has simultaneously pressed more than
-;; one modifier alias. We're not sure what to do yet, since
-;; they might release them all or go on to press a regular key
-;; they want to modify.
-(defrecord MultiArmed [down-modifiers pending-keys aliases]
-  h/IKeyHandler
-  (process [this keyevent]
+  MultiArmed
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
     (let [{:keys [key direction]} keyevent
-          modifier? (contains? aliases key)
-          up? (= direction :up)
-          down? (not up?)]
+          modifier?               (contains? aliases key)
+          up?                     (= direction :up)
+          down?                   (not up?)]
       (cond
        (and modifier? down?)
        {:handler (MultiArmed.
@@ -105,19 +119,14 @@
        (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was multi-armed: " keyevent)
                        {:keyevent keyevent
                         :reason :weird-state
-                        :source this}))))))
+                        :source this})))))
 
-;; Deciding: The user might be trying to alias: we'll know for
-;; sure if the next thing that happens is a regular key down.
-;; Otherwise, it was probably just multiple accidental
-;; simultaneous key presses.
-(defrecord Deciding [down-modifiers pending-keys aliases]
-  h/IKeyHandler
-  (process [this keyevent]
+  Deciding
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
     (let [{:keys [key direction]} keyevent
-          modifier? (contains? aliases key)
-          up? (= direction :up)
-          down? (not up?)]
+          modifier?               (contains? aliases key)
+          up?                     (= direction :up)
+          down?                   (not up?)]
       (cond
        (and (not modifier?) down?)
        {:handler (Deciding. down-modifiers (conj pending-keys key) aliases)}
@@ -132,27 +141,23 @@
        {:handler nil
         :effects (concat (map #(key-effect keyevent % :dn) down-modifiers)
                          (map #(key-effect keyevent % :dn) pending-keys)
-                         [(key-effect keyevent key direction)])}))))
+                         [(key-effect keyevent key direction)])})))
 
-;; Aliasing: we're treating modifiers as their aliases, until the last
-;; one goes up
-(defrecord Aliasing [down-modifiers pending-keys aliases]
-  h/IKeyHandler
-  (process [this keyevent]
+  Aliasing
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
     (let [{:keys [key direction]} keyevent
-          modifier? (contains? aliases key)
-          up? (= direction :up)
-          down? (not up?)]
-      (let [new-down-modifiers
-            (cond
-             (and modifier? down?)
-             (conj-if-missing down-modifiers key)
+          modifier?               (contains? aliases key)
+          up?                     (= direction :up)
+          down?                   (not up?)
+          new-down-modifiers      (cond
+                                   (and modifier? down?)
+                                   (conj-if-missing down-modifiers key)
 
-             (and modifier? up?)
-             (filterv #(not= key %) down-modifiers)
+                                   (and modifier? up?)
+                                   (filterv #(not= key %) down-modifiers)
 
-             :else
-             down-modifiers)]
-        {:handler (when (seq new-down-modifiers)
-                    (Aliasing. new-down-modifiers nil aliases))
-         :effects [(key-effect keyevent (get aliases key key) direction)]}))))
+                                   :else
+                                   down-modifiers)]
+      {:handler (when (seq new-down-modifiers)
+                  (Aliasing. new-down-modifiers nil aliases))
+       :effects [(key-effect keyevent (get aliases key key) direction)]})))

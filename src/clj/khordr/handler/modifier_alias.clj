@@ -104,7 +104,7 @@
                   aliases)}
 
        (and modifier? up?)
-       (let [new-down-modifiers (filterv #(not= modifier? %)
+       (let [new-down-modifiers (filterv #(not= key %)
                                          down-modifiers)]
          (if (seq new-down-modifiers)
            {:handler (MultiArmed.

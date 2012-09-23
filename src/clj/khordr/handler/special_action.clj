@@ -5,7 +5,7 @@
 
 (defrecord InitializedHandler [trigger]
   h/KeyHandler
-  (process [this keyevent]
+  (process [this state keyevent]
     (let [{:keys [key direction]} keyevent]
       (cond
        (and (= key trigger) (= direction :up))
@@ -25,6 +25,6 @@
 ;; The first key event we get is the thing that triggered us
 (defrecord Handler []
   h/KeyHandler
-  (process [this keyevent]
+  (process [this state keyevent]
     {:handler (InitializedHandler. (:key keyevent))}))
 

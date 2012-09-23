@@ -46,7 +46,7 @@
   [behaviors]
   {:behaviors behaviors
    :handler nil
-   :positions {}})
+   :down-keys #{}})
 
 ;; Defines how a matcher like {:key #{:a :b} :direction :up} matches a
 ;; keyevent like {:key :a :direction :dn :device 2}
@@ -129,7 +129,7 @@
   and which are down."
   [state keyevent]
   (let [{:keys [key direction]} keyevent]
-   (assoc-in state [:positions key] direction)))
+   (update-in state [:down-keys] (if (= direction :up) disj conj) key)))
 
 (defn handle-keys
   "Given the current state and a key event, return an updated state."
@@ -140,14 +140,14 @@
   (let [{:keys [key direction]} keyevent
         _ (log/debug (:handler state))
         _ (log/debug keyevent)
-        ;; Important! Don't update the positions until after we add
-        ;; the new handler, since whether or not we add one might
-        ;; depend on whether a key is already down.
         state (maybe-add-handler state keyevent)
-        state (update-key-positions state keyevent)
-        ;; Walk the handler chain, dealing with the results at each step
         handler (:handler state)
-        results (h/process handler keyevent)]
+        results (h/process handler state keyevent)
+        ;; Important! Don't update the positions until after we
+        ;; process the key, since the new handler might care whether
+        ;; any keys are down other than the one that triggered the new
+        ;; handler.
+        state (update-key-positions state keyevent)]
     (log/debug results)
     (log/debug "----------")
     (-> state

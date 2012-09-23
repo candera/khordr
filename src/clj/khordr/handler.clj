@@ -2,9 +2,9 @@
   "Defines the interface for khordr key handlers")
 
 (defprotocol KeyHandler
-  (process [this keyevent]
-    "Process a key event, returning a map. The map should contain the
-  following keys:
+  (process [this state keyevent]
+    "Process given the application state and a key event, returning a
+  map. The map should contain the following keys:
 
   :handler - either an implementation of KeyHandler representing the
              updated state of this handler or nil, indicating that the
@@ -16,7 +16,7 @@
 ;; yourself when self-key goes up.
 (defrecord DefaultKeyHandler [self-key]
   KeyHandler
-  (process [this keyevent]
+  (process [this _ keyevent]
     (let [{:keys [key direction]} keyevent]
       {:handler (when-not (and (= direction :up)
                                (= key (:self-key this)))
@@ -30,7 +30,7 @@
 ;; activating a handler.
 (extend-protocol KeyHandler
   nil
-  (process [_ keyevent]
+  (process [_ _ keyevent]
     {:handler nil
      :effects [{:effect :key :event keyevent}]}))
 

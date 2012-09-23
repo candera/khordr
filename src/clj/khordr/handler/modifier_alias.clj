@@ -46,21 +46,26 @@
 (extend-protocol h/KeyHandler
 
   Handler
-  (process [{:keys [aliases] :as this} keyevent]
-    (let [{:keys [key direction]} keyevent
-          modifier?               (contains? aliases key)
-          up?                     (= direction :up)
-          down?                   (not up?)]
+  (process [{:keys [aliases] :as this} state keyevent]
+    ;; If there are already keys down, we don't want to do any special
+    ;; processing: It's a rollover situation
+    (if-not (empty? (:down-keys state))
+      {:handler nil
+       :effect :key :event keyevent}
+      (let [{:keys [key direction]} keyevent
+            modifier?               (contains? aliases key)
+            up?                     (= direction :up)
+            down?                   (not up?)]
 
-      (if (and modifier? down?)
-        {:handler (Armed. key aliases)}
-        (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
-                        {:keyevent keyevent
-                         :reason :weird-state
-                         :source this})))))
+        (if (and modifier? down?)
+          {:handler (Armed. key aliases)}
+          (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
+                          {:keyevent keyevent
+                           :reason :weird-state
+                           :source this}))))))
 
   Armed
-  (process [{:keys [trigger aliases] :as this} keyevent]
+  (process [{:keys [trigger aliases] :as this} state keyevent]
     (let [{:keys [key direction]} keyevent
           modifier?               (contains? aliases key)
           up?                     (= direction :up)
@@ -86,7 +91,7 @@
                         :source this})))))
 
   MultiArmed
-  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} state keyevent]
     (let [{:keys [key direction]} keyevent
           modifier?               (contains? aliases key)
           up?                     (= direction :up)
@@ -122,7 +127,7 @@
                         :source this})))))
 
   Deciding
-  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} state keyevent]
     (let [{:keys [key direction]} keyevent
           modifier?               (contains? aliases key)
           up?                     (= direction :up)
@@ -144,7 +149,7 @@
                          [(key-effect keyevent key direction)])})))
 
   Aliasing
-  (process [{:keys [down-modifiers pending-keys aliases] :as this} keyevent]
+  (process [{:keys [down-modifiers pending-keys aliases] :as this} state keyevent]
     (let [{:keys [key direction]} keyevent
           modifier?               (contains? aliases key)
           up?                     (= direction :up)

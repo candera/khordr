@@ -1,7 +1,8 @@
 (ns khordr.handler.special-action
   "Implements the special action handler, which takes care of built-in
   actions, such as qutting and suspending the application."
-  (:require [khordr.handler :as h]))
+  (:require [khordr.handler :as h])
+  (:import [khordr.effect Key Quit]))
 
 (defrecord InitializedHandler [trigger]
   h/KeyHandler
@@ -10,14 +11,12 @@
       (cond
        (and (= key trigger) (= direction :up))
        {:handler nil
-        :effects [{:effect :key
-                   :event (assoc keyevent :key trigger :direction :dn)}
-                  {:effect :key
-                   :event (assoc keyevent :key trigger :direction :up)}]}
+        :effects [(Key. (assoc keyevent :key trigger :direction :dn))
+                  (Key. (assoc keyevent :key trigger :direction :up))]}
 
        (and (= key :q) (= direction :dn))
        {:handler this
-        :effects [{:effect :quit}]}
+        :effects [(Quit.)]}
 
        :else
        {:handler this}))))

@@ -2,7 +2,8 @@
   "Implements the modifier alias key handler, which allows the typist
   to use alternate keys as modifiers (e.g. j for shift, k for control,
   l for alt, etc.)."
-  (:require [khordr.handler :as h]))
+  (:require [khordr.handler :as h])
+  (:import khordr.effect.Key))
 
 (defn conj-if-missing
   "Returns coll with elem conj'd on, but only if coll does not already
@@ -15,7 +16,7 @@
 (defn key-effect
   "Creates a key effect given a keyevent template, a key, and a direction."
   [template key direction]
-  {:effect :key :event (assoc template :key key :direction direction)})
+  (Key. (assoc template :key key :direction direction)))
 
 ;; Handler: we start here. The very next thing to happen should be
 ;; that we get the key down that activated this handler, which pushes
@@ -32,7 +33,7 @@
 ;; one modifier alias. We're not sure what to do yet, since
 ;; they might release them all or go on to press a regular key
 ;; they want to modify.
-(defrecord MultiArmed [down-modifiers pending-keys aliases])
+(defrecord MultiArmed [down-modifiers aliases])
 
 ;; Deciding: The user might be trying to alias: we'll know for
 ;; sure if the next thing that happens is a regular key down.
@@ -51,7 +52,7 @@
     ;; processing: It's a rollover situation
     (if-not (empty? (:down-keys state))
       {:handler nil
-       :effects [{:effect :key :event keyevent}]}
+       :effects [(Key. keyevent)]}
       (let [{:keys [key direction]} keyevent
             modifier?               (contains? aliases key)
             up?                     (= direction :up)
@@ -74,7 +75,7 @@
        (and modifier? down?)
        (if (= key trigger)
          {:handler this}                ; It's a repeat
-         {:handler (MultiArmed. [trigger key] [] aliases)})
+         {:handler (MultiArmed. [trigger key] aliases)})
 
        (and modifier? up?)
        {:handler nil
@@ -91,7 +92,7 @@
                         :source this})))))
 
   MultiArmed
-  (process [{:keys [down-modifiers pending-keys aliases] :as this} state keyevent]
+  (process [{:keys [down-modifiers aliases] :as this} state keyevent]
     (let [{:keys [key direction]} keyevent
           modifier?               (contains? aliases key)
           up?                     (= direction :up)
@@ -100,18 +101,14 @@
        (and modifier? down?)
        {:handler (MultiArmed.
                   (conj-if-missing down-modifiers key)
-                  pending-keys
                   aliases)}
 
        (and modifier? up?)
-       (let [new-down-modifiers (filterv #(not= key %)
-                                         down-modifiers)]
-         (if (seq new-down-modifiers)
-           {:handler (MultiArmed.
-                      new-down-modifiers
-                      pending-keys
-                      aliases)}
-           {:handler nil}))
+       (let [new-down-modifiers (filterv (complement #{key}) down-modifiers)]
+        {:handler (Aliasing. new-down-modifiers [] aliases)
+         :effects (concat (map #(key-effect keyevent (aliases %) :dn)
+                               new-down-modifiers)
+                          [(key-effect keyevent key :dn) keyevent])})
 
        (and (not modifier?) down?)
        {:handler (Aliasing. down-modifiers [] aliases)
@@ -154,6 +151,10 @@
           modifier?               (contains? aliases key)
           up?                     (= direction :up)
           down?                   (not up?)
+          ;; TODO: Should these be modifiers, or interpreted as
+          ;; regular keys that are themselves modified? Because we
+          ;; interpret it more or less in the latter manner in the
+          ;; MultiArmed state.
           new-down-modifiers      (cond
                                    (and modifier? down?)
                                    (conj-if-missing down-modifiers key)

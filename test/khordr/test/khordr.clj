@@ -3,8 +3,10 @@
   (:require [khordr :refer (handle-keys
                             base-state
                             match?
-                            enact-effects!)])
-  (:use [clojure.test]))
+                            enact-effects!)]
+            [khordr.effect :as e])
+  (:use [clojure.test])
+  (:import [khordr.effect Key Quit]))
 
 (def test-key-behaviors
   '[{:match {:key #{:j :k} :direction :dn}
@@ -27,7 +29,7 @@
 
 (defn- key-effect
   [[key direction]]
-  {:effect :key :event {:key key :direction direction}})
+  (Key. {:key key :direction direction}))
 
 (defn- press
   "Given a seq of pairs of [key direction], return a seq of
@@ -207,7 +209,7 @@
 
        ;; We have the ability to quit the application
        [[:backtick :dn] [:q :dn]]
-       [{:effect :quit}]
+       [(Quit.)]
 
        ;; But other nearby key sequences don't quit
        [[:backtick :dn] [:backtick :up] [:q :dn] [:backtick :dn]]
@@ -227,14 +229,12 @@
                    (send-key [this keyevent]
                      (swap! sent-keys concat [keyevent])))]
     (is (= {} (enact-effects! {:effects []} platform)))
-    (enact-effects! {:effects [{:effect :key
-                                :event {:key :a :direction :dn}}
-                               {:effect :key
-                                :event {:key :a :direction :up}}]}
+    (enact-effects! {:effects [(e/Key. {:key :a :direction :dn})
+                               (e/Key. {:key :a :direction :up})]}
                     platform)
     (is (= @sent-keys [{:key :a :direction :dn}
                        {:key :a :direction :up}]))
-    (is (:done (enact-effects! {:effects [{:effect :quit}]} platform)))))
+    (is (:done (enact-effects! {:effects [(e/Quit.)]} platform)))))
 
 (deftest behavior-match
 

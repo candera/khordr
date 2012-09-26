@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [key send])
   (:require [khordr.platform.common :as com]
             [khordr.logging :as log]
-            [khordr.handler :as h]))
+            [khordr.handler :as h]
+            [khordr.effect :as e]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -159,45 +160,13 @@
 ;; Effects handling
 ;;
 
-(defmulti enact
-  "Extension point for effects produced by handlers."
-  (fn [effect state platform] (:effect effect)))
-
-(defmethod enact :key
-  [effect state platform]
-  (com/send-key platform (:event effect))
-  state)
-
-(defmethod enact :quit
-  [_ state _]
-  (assoc state :done true))
-
-(defmethod enact :cycle-log
-  [_ state _]
-  (case (log/log-level)
-    :debug
-    (do
-      (log/set-log-level! :info)
-      (println "Log level set to INFO"))
-
-    :info
-    (do
-      (log/set-log-level! :error)
-      (println "Log level set to ERROR"))
-
-    :error
-    (do
-      (log/set-log-level! :debug)
-      (println "Log level set to DEBUG")))
-  state)
-
 (defn enact-effects!
   "Given the state, enact any pending effects and return a new state."
   [state platform]
   (loop [state state
          [effect & more] (:effects state)]
     (if effect
-      (let [state (enact effect state platform)]
+      (let [state (e/enact effect state platform)]
         (recur state more))
       (dissoc state :effects))))
 

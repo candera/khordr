@@ -1,5 +1,7 @@
 (ns khordr.handler
-  "Defines the interface for khordr key handlers")
+  "Defines the interface for khordr key handlers"
+  (:require [khordr.effect :as e])
+  (:import khordr.effect.Key))
 
 (defprotocol KeyHandler
   (process [this state keyevent]
@@ -17,5 +19,5 @@
   nil
   (process [_ _ keyevent]
     {:handler nil
-     :effects [{:effect :key :event keyevent}]}))
+     :effects [(Key. keyevent)]}))
 

@@ -535,11 +535,12 @@ results
 
 (-> default-key-behaviors
     base-state
-    (handle-keys {:key :rshift :direction :dn})
-    (handle-keys {:key :x :direction :dn})
-    (handle-keys {:key :x :direction :up})
-    (handle-keys {:key :rshift :direction :up})
-    (handle-keys {:key :j :direction :dn})
+    (handle-keys {:key :d :direction :dn})
+    (handle-keys {:key :s :direction :dn})
+    (handle-keys {:key :d :direction :up})
+    ;;(handle-keys {:key :s :direction :up})
+    (dissoc :behaviors)
+
 )
 
 

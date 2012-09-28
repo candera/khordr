@@ -8,14 +8,8 @@
   (:use [clojure.test])
   (:import [khordr.effect Key Quit]))
 
-(def test-key-behaviors
-  '[{:match {:key #{:j :k} :direction :dn}
-     :handler khordr.handler.modifier-alias/Handler
-     :args [{:j :rshift, :k :rcontrol}] }
-    {:match {:key :backtick :direction :dn}
-     :handler khordr.handler.special-action/Handler}])
 
-(defn- sent
+#_(defn- sent
   "Given a sequence of key events, return the sequence of keys that
   will actually be sent."
   [events]
@@ -31,7 +25,7 @@
   [[key direction]]
   (Key. {:key key :direction direction}))
 
-(defn- press
+#_(defn- press
   "Given a seq of pairs of [key direction], return a seq of
   corresponding key effects."
   [pressed]
@@ -113,114 +107,6 @@
   [keyset n]
   (filter valid? (all-events keyset n)))
 
-(deftest key-tests
-  (are [pressed anticipated]
-       ;; We use vectors as the test format because they're easier to
-       ;; read, but we still want to use maps as the underlying
-       ;; construct for their flexibility. Yay juxt!
-       (= anticipated (press pressed))
-       ;; Single regular key press
-       [[:b :dn]]
-       [(key-effect [:b :dn])]
-
-       ;; Single regular key press and release
-       [[:b :dn] [:b :up]]
-       [(key-effect [:b :dn]) (key-effect [:b :up])]
-
-       ;; Modifier alias press only
-       [[:j :dn]]
-       []
-
-       ;; Modifier alias press and release
-       [[:j :dn] [:j :up]]
-       [(key-effect [:j :dn]) (key-effect [:j :up])]
-
-       ;; Modifier alias repeat and release
-       [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
-       [(key-effect [:j :dn]) (key-effect [:j :up])]
-
-       ;; Modifier alias with regular key press results in no events
-       ;; because we're not sure yet whether the user is just
-       ;; "rolling" through keys or trying to modify
-       [[:j :dn] [:x :dn]]
-       []
-
-       ;; Modifier aliasing happens as soon as regular key goes up
-       [[:j :dn] [:x :dn] [:x :up]]
-       [(key-effect [:rshift :dn])
-        (key-effect [:x :dn])
-        (key-effect [:x :up])]
-
-       ;; Modifier alias with regular key press and release
-       [[:j :dn] [:x :dn] [:x :up] [:j :up]]
-       [(key-effect [:rshift :dn])
-        (key-effect [:x :dn])
-        (key-effect [:x :up])
-        (key-effect [:rshift :up])]
-
-       ;; Modifier alias with regular key press and release followed
-       ;; by modifier alias press and release
-       [[:j :dn] [:x :dn] [:x :up] [:j :up] [:j :dn] [:j :up]]
-       (map key-effect
-            [[:rshift :dn]
-             [:x :dn]
-             [:x :up]
-             [:rshift :up]
-             [:j :dn]
-             [:j :up]])
-
-       ;; Multiple modifier aliases down followed by regular key down
-       ;; adds both modifiers to regular key
-       [[:j :dn] [:k :dn] [:x :dn] [:x :up]]
-       (map key-effect
-            [[:rshift :dn]
-             [:rcontrol :dn]
-             [:x :dn]
-             [:x :up]])
-
-       ;; Order of modifier aliases down is preserved? (TODO: Is this
-       ;; what we want?)
-       [[:k :dn] [:j :dn] [:x :dn] [:x :up]]
-       (map key-effect
-            [[:rcontrol :dn]
-             [:rshift :dn]
-             [:x :dn]
-             [:x :up]])
-
-       ;; A modifier alias going up when another modifier is undecided
-       ;; means the user changed their mind. Do nothing.
-       [[:j :dn] [:k :dn] [:k :up]]
-       []
-
-       ;; Adding and subtracting modifiers: you can change your mind
-       ;; by releasing a modifier and pressing it (or a different one)
-       ;; again.
-       [[:j :dn] [:k :dn] [:k :up] [:k :dn] [:x :dn]]
-       (map key-effect
-            [[:rshift :dn]
-             [:rcontrol :dn]
-             [:x :dn]])
-
-       ;; Rollover keys still work
-       [[:r :dn] [:k :dn]]
-       (map key-effect
-            [[:r :dn]
-             [:k :dn]])
-
-       ;; We have the ability to quit the application
-       [[:backtick :dn] [:q :dn]]
-       [(Quit.)]
-
-       ;; But other nearby key sequences don't quit
-       [[:backtick :dn] [:backtick :up] [:q :dn] [:backtick :dn]]
-       [(key-effect [:backtick :dn])
-        (key-effect [:backtick :up])
-        (key-effect [:q :dn])
-        ;;(key-effect [:backtick :dn])
-        ]
-
-       ;; TODO: Also move towards using key maps to describe keys even on output
-       ))
 
 (deftest enact-test
   (let [sent-keys (atom [])

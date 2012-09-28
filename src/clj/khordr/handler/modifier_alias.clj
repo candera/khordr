@@ -104,11 +104,20 @@
                   aliases)}
 
        (and modifier? up?)
-       (let [new-down-modifiers (filterv (complement #{key}) down-modifiers)]
-        {:handler (Aliasing. new-down-modifiers [] aliases)
-         :effects (concat (map #(key-effect keyevent (aliases %) :dn)
-                               new-down-modifiers)
-                          [(key-effect keyevent key :dn) keyevent])})
+       ;; This can either be a rollover situation, or it can be
+       ;; someone trying to modify a modifier key. Which one it is
+       ;; depends on whether the modifier going up was the first one
+       ;; that went down or not.
+       (if (= key (first down-modifiers))
+         {:handler nil                  ; TODO: Go back to Deciding?
+          :effects (conj (mapv #(key-effect keyevent % :dn) down-modifiers)
+                         (key-effect keyevent key :up))}
+         (let [new-down-modifiers (filterv (complement #{key}) down-modifiers)]
+           {:handler (Aliasing. new-down-modifiers [] aliases)
+            :effects (concat (map #(key-effect keyevent (aliases %) :dn)
+                                  new-down-modifiers)
+                             [(key-effect keyevent key :dn)
+                              (key-effect keyevent key :up)])}))
 
        (and (not modifier?) down?)
        {:handler (Aliasing. down-modifiers [] aliases)

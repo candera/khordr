@@ -505,7 +505,7 @@ results
 
 (cross-prod [:a :b] [:c :d])
 
-(use :reload 'khordr)
+(use :reload-all 'khordr)
 
 (-> default-key-behaviors
     base-state
@@ -543,4 +543,9 @@ results
 
 )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(in-ns 'khordr.handler.modifier-alias)
 
+(h/process (->MultiArmed [:d :s] {:s :lalt :d :lcontrol})
+           {} 
+           {:key :d :direction :up})

@@ -114,3 +114,8 @@
          {:handler nil
           :effects [(e/->Key {:key :j :direction :dn})]})))
 
+(deftest only-alias-actual-alias-keys
+  ;; Only the aliases that were down at the point where we start
+  ;; aliasing should actually be aliased.
+  (keytest [[:j :dn] [:k :dn] [:k :up] [:k :dn]]
+           [[:rshift :dn] [:k :dn] [:k :up] [:k :dn]]))

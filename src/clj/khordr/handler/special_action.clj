@@ -2,7 +2,7 @@
   "Implements the special action handler, which takes care of built-in
   actions, such as qutting and suspending the application."
   (:require [khordr.handler :as h])
-  (:import [khordr.effect Key Quit]))
+  (:import [khordr.effect Key Quit CycleLog]))
 
 (defrecord InitializedHandler [trigger]
   h/KeyHandler
@@ -17,6 +17,10 @@
        (and (= key :q) (= direction :dn))
        {:handler this
         :effects [(Quit.)]}
+
+       (and (= key :l) (= direction :dn))
+       {:handler this
+        :effects [(CycleLog.)]}
 
        :else
        {:handler this}))))

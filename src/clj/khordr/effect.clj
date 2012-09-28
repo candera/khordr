@@ -36,7 +36,8 @@
       :error
       (do
         (log/set-log-level! :debug)
-        (println "Log level set to DEBUG")))))
+        (println "Log level set to DEBUG")))
+    state))
 
 (defn enact-effects!
   "Given the state, enact any pending effects and return a new state."

@@ -35,7 +35,9 @@
      :handler khordr.handler.modifier-alias/Handler
      :args [{:f :lshift :d :lcontrol :s :lalt}]}
     {:match {:key :backtick}
-     :handler khordr.handler.special-action/Handler}])
+     :handler khordr.handler.special-action/Handler}
+    {:match {:key #{:rshift :lshift :rcontrol :lcontrol :lalt :ralt :capslock}}
+     :handler khordr.handler.suppressor/Handler}])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

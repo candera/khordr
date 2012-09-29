@@ -113,14 +113,15 @@
           :effects (conj (mapv #(key-effect keyevent % :dn) down-modifiers)
                          (key-effect keyevent key :up))}
          (let [new-down-modifiers (filterv (complement #{key}) down-modifiers)]
-           {:handler (Aliasing. new-down-modifiers [] aliases)
+           {:handler (Aliasing. new-down-modifiers []
+                                (select-keys aliases down-modifiers))
             :effects (concat (map #(key-effect keyevent (aliases %) :dn)
                                   new-down-modifiers)
                              [(key-effect keyevent key :dn)
                               (key-effect keyevent key :up)])}))
 
        (and (not modifier?) down?)
-       {:handler (Aliasing. down-modifiers [] aliases)
+       {:handler (Aliasing. down-modifiers [] (select-keys aliases down-modifiers))
         :effects (conj
                   (mapv #(key-effect keyevent % :dn)
                         (map aliases down-modifiers))
@@ -143,7 +144,7 @@
        {:handler (Deciding. down-modifiers (conj pending-keys key) aliases)}
 
        (and (not modifier?) up?)
-       {:handler (Aliasing. down-modifiers [] aliases)
+       {:handler (Aliasing. down-modifiers [] (select-keys aliases down-modifiers))
         :effects (concat (map #(key-effect keyevent % :dn) (map aliases down-modifiers))
                          (map #(key-effect keyevent % :dn) pending-keys)
                          [(key-effect keyevent key :up)])}
@@ -174,5 +175,6 @@
                                    :else
                                    down-modifiers)]
       {:handler (when (seq new-down-modifiers)
-                  (Aliasing. new-down-modifiers nil aliases))
+                  (Aliasing. new-down-modifiers nil
+                             (select-keys aliases new-down-modifiers)))
        :effects [(key-effect keyevent (get aliases key key) direction)]})))

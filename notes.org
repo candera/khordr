@@ -148,6 +148,10 @@ dependency? Either way, it looks like I really need to figure out a
 way to have alternative setups in the project.clj, since I wind up
 switching back and forth a lot.
 ** Bugs in current version
+
+Note: bugs should be registered in the project tracker from here on
+out.
+
 *** FIXED Typing "test" quickly does not work
 *** FIXED We get trapped in the ModifierKeyAlias sometimes
 *** FIXED We get weird state state exception from ModifierKeyAlias sometimes
@@ -162,3 +166,28 @@ depend entirely on the keyboard, although they can all do at least
 two. The fix here is to by a keyboard that supports n-key rollover
 (NKRO). I'm using a dasKeyboard brand, and it seems to work just fine.
 
+
+** Limitations of ModifierAliasKeyHandler
+*** False negatives
+There are a fairly high number of false negatives. That it, it often
+happens that when I mean to use a home row key as a modifier, I
+instead roll over, resulting in two keys being typed. I'm not sure yet
+if that's just a familiarity thing or if I'm just wired to roll over
+based on how the normal modifier keys get used.
+*** Key force
+I find that I sometimes tend to type the modifiers with more than
+usual force. I wonder whether that might be an ergonomic problem for
+some people.
+*** No way to do solo modifier keys in training mode
+When I engage training mode (turn off the normal modifier keys),
+there's no way to register, for example, "control down". That is
+occasionally needed. For example, to do a mouse wheel zoom. Of course,
+if I'm not in training mode, I can just use the regular control key.
+*** Indecision
+I occasionally press a modifier alias and then change my mind, which
+results in a spurious key press. It's not really a big deal, but it
+would be great if there were a way to cancel modification. Maybe by
+hitting escape or something. Although that would have the problem that
+then there would be no way to modify whatever the cancellation key
+was. Perhaps backtick? We already use that for a bunch of other
+things, although it's configured that way rather than hard-coded.

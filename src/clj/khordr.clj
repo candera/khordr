@@ -28,16 +28,8 @@
 
 (def ^{:doc "Relates keys to behaviors. Absence from this data structure means it's a regular key."}
   default-key-behaviors
-  '[{:match {:key #{:j :k :l}}
-     :handler khordr.handler.modifier-alias/Handler
-     :args [{:j :rshift :k :rcontrol :l :ralt}]}
-    {:match {:key #{:f :d :s}}
-     :handler khordr.handler.modifier-alias/Handler
-     :args [{:f :lshift :d :lcontrol :s :lalt}]}
-    {:match {:key :backtick}
-     :handler khordr.handler.special-action/Handler}
-    {:match {:key #{:rshift :lshift :rcontrol :lcontrol :lalt :ralt :capslock}}
-     :handler khordr.handler.suppressor/Handler}])
+  '[{:match {:key :backtick}
+     :handler khordr.handler.special-action/Handler}])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

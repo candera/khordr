@@ -9,9 +9,4 @@
                  "sonatype" "http://oss.sonatype.org/content/repositories/releases"
                  "nativelibs4java-repo" "http://nativelibs4java.sourceforge.net/maven"}
   :jvm-opts ["-Djna.library.path=ext"]
-  ;; At the moment, the AOT that this requires is causing me all sorts
-  ;; of problems, and I don't understand why. I will proceed without
-  ;; it for now, but I'm going to need to get this working at some
-  ;; point.
-  ;; :main khordr.main
-  )
+  :main khordr.main)

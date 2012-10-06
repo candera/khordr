@@ -119,3 +119,9 @@
   ;; aliasing should actually be aliased.
   (keytest [[:j :dn] [:k :dn] [:k :up] [:k :dn]]
            [[:rshift :dn] [:k :dn] [:k :up] [:k :dn]]))
+
+(deftest repeats-trigger-aliasing
+  ;; If we see a regular key go down twice in a row without going up
+  ;; first, then it's a repeat and we should trigger aliasing.
+  (keytest [[:j :dn] [:x :dn] [:x :dn]]
+           [[:rshift :dn] [:x :dn] [:x :dn]]))

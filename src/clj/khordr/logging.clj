@@ -1,6 +1,6 @@
 (ns khordr.logging)
 
-(def ^:dynamic *log-level* :error)
+(def ^:dynamic *log-level* :info)
 
 (def log-level-values
   {:debug 3

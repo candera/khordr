@@ -10,6 +10,10 @@
               :handler khordr.handler.modifier-alias/Handler
               :args [{:f :lshift :d :lcontrol :s :lalt}]}
              {:id :special-actions
+              :notoggle true            ; Otherwise we'll toggle
+                                        ; ourselves off with the other
+                                        ; behaviors and never be able
+                                        ; to toggle back on
               :match {:key :backtick}
               :handler khordr.handler.special-action/Handler}
              ;; {:id :modifier-suppressors 

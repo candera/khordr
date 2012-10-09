@@ -2,7 +2,7 @@
   "Implements the special action handler, which takes care of built-in
   actions, such as qutting and suspending the application."
   (:require [khordr.handler :as h])
-  (:import [khordr.effect Key Quit CycleLog]))
+  (:import [khordr.effect Key Quit CycleLog ToggleBehaviors]))
 
 (defrecord InitializedHandler [trigger acting]
   h/KeyHandler
@@ -15,6 +15,8 @@
                    [(Key. (assoc keyevent :key trigger :direction :dn))
                     (Key. (assoc keyevent :key trigger :direction :up))])}
 
+       ;; TODO: Make these next few driven by config, not hardcoded.
+       ;; Probably through some sort of generic TriggerHandler.
        (and (= key :q) (= direction :dn))
        {:handler (InitializedHandler. trigger true)
         :effects [(Quit.)]}
@@ -22,6 +24,10 @@
        (and (= key :l) (= direction :dn))
        {:handler (InitializedHandler. trigger true)
         :effects [(CycleLog.)]}
+
+       (and (= key :p) (= direction :dn))
+       {:handler (InitializedHandler. trigger true)
+        :effects [(ToggleBehaviors.)]}
 
        :else
        {:handler (InitializedHandler. trigger true)}))))

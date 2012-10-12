@@ -89,22 +89,29 @@ main(void)
 
   // Create an event tap. We are interested in key presses.
   eventMask = ((1 << kCGEventKeyDown) |
-               (1 << kCGEventKeyUp) |
-               (1 << kCGEventFlagsChanged));
+               //(1 << kCGEventKeyUp) |
+               //(1 << kCGEventFlagsChanged)
+               );
   eventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, 0,
                               eventMask, myCGEventCallback, NULL);
+
+  printf("eventTap: 0x%lx\n", eventTap);
   if (!eventTap) {
     fprintf(stderr, "failed to create event tap\n");
     exit(1);
   }
 
   // Create a run loop source.
+  printf("CFMAchPortCreateRunLoopSource(0x%lx, 0x%lx, 0)\n", kCFAllocatorDefault, eventTap);
   runLoopSource = CFMachPortCreateRunLoopSource(
                                                 kCFAllocatorDefault, eventTap, 0);
 
   // Add to the current run loop.
   CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource,
                      kCFRunLoopCommonModes);
+
+
+  printf("kCFRunLoopCommonModes: 0x%lx\n", kCFRunLoopCommonModes);
 
   // Enable the event tap.
   CGEventTapEnable(eventTap, true);

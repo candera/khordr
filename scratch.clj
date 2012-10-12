@@ -549,3 +549,86 @@ results
 (h/process (->MultiArmed [:d :s] {:s :lalt :d :lcontrol})
            {} 
            {:key :d :direction :up})
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def eventcount (atom 0))
+(defn go []
+  (let [i khordr.ApplicationServicesLibrary/INSTANCE
+        eventTap (.CGEventTapCreate 
+                  i 
+                  khordr.ApplicationServicesLibrary$CGEventTapLocation/kCGSessionEventTap
+                  khordr.ApplicationServicesLibrary$CGEventTapPlacement/kCGHeadInsertEventTap
+                  0
+                  khordr.ApplicationServicesLibrary$CGEventType/kCGEventKeyDown
+                  (reify khordr.ApplicationServicesLibrary$CGEventTapCallback
+                    (onevent [this _ _ event _] (println "event!") (swap! eventcount inc) event))
+                  nil)
+        runLoopSource (.CFMachPortCreateRunLoopSource
+                       i
+                       nil 
+                       eventTap
+                       0)]
+    (println "eventTap: " eventTap)
+    (println "*eventTap: " (.getPointer eventTap 0))
+    (.CFRunLoopAddSource 
+     i
+     (.CFRunLoopGetCurrent i)
+     runLoopSource
+     (.getPointer (.getGlobalVariableAddress (com.sun.jna.NativeLibrary/getInstance "ApplicationServices") "kCFRunLoopCommonModes") 0)
+     )
+    (.CGEventTapEnable i eventTap true)
+    (.CFRunLoopRun i)))
+
+(def f (future (go)))
+
+(println "foo")
+
+(def eventcount (atom 0))
+(def i khordr.ApplicationServicesLibrary/INSTANCE)
+(def eventTap (.CGEventTapCreate 
+               i 
+               khordr.ApplicationServicesLibrary$CGEventTapLocation/kCGSessionEventTap
+               khordr.ApplicationServicesLibrary$CGEventTapPlacement/kCGHeadInsertEventTap
+               0
+               khordr.ApplicationServicesLibrary$CGEventType/kCGEventKeyDown
+               (reify khordr.ApplicationServicesLibrary$CGEventTapCallback
+                 (onevent [this _ _ event _] (swap! eventcount inc) nil))
+               nil))
+
+eventTap
+
+(-> eventTap
+    (.getPointer 0)
+    (.getPointer 0)
+    (.getPointer 0)
+    (.getPointer 0)
+    (.getPointer 0)
+    (.getPointer 0)
+    (.getPointer 0))
+
+
+(def runLoopSource (.CFMachPortCreateRunLoopSource
+                    i
+                    nil 
+                    eventTap
+                    0))
+
+(-> runLoopSource
+    (.getPointer 0))
+
+(.CFRunLoopAddSource 
+ i
+ (.CFRunLoopGetCurrent i)
+ runLoopSource
+ (.getPointer (.getGlobalVariableAddress (com.sun.jna.NativeLibrary/getInstance "ApplicationServices") "kCFRunLoopCommonModes")
+              0) )
+
+
+(.CGEventTapEnable i eventTap true)
+
+(def f (future (.CFRunLoopRun i)))
+
+
+(.getPointer (.getPointer eventTap 0) 0)
+

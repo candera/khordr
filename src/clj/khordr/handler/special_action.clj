@@ -36,4 +36,8 @@
 (defrecord Handler []
   h/KeyHandler
   (process [this state keyevent]
-    {:handler (InitializedHandler. (:key keyevent) false)}))
+    (if (seq (:down-keys state))
+      ;; We only want to act if nothing else is already pressed
+      {:handler nil
+       :effects [(Key. keyevent)]}
+      {:handler (InitializedHandler. (:key keyevent) false)})))

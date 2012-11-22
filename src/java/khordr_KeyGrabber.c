@@ -78,23 +78,14 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
  jclass kgcls,
  jobject sink)
 {
-  LOG("grab: a\n");
-  fprintf(stdout, "env = 0x%x\n", env);
-  fprintf(stdout, "*env = 0x%x\n", *env);
-  fflush(stdout);
   jclass cls = (*env)->GetObjectClass(env, sink);
-  LOG("grab: a.1\n")
   onKeyEvent = (*env)->GetMethodID(env, cls, "onKeyEvent", "(II)V");
-  LOG("grab: a.2\n")
   eventSink = (*env)->NewGlobalRef(env, sink);
-  LOG("grab: a.3\n")
   jnienv = env;
 
   CFMachPortRef      eventTap;
   CGEventMask        eventMask;
   CFRunLoopSourceRef runLoopSource;
-
-  LOG("grab: a.4\n")
 
   // Create an event tap. We are interested in key presses.
   eventMask = ((1 << kCGEventKeyDown) |
@@ -104,7 +95,6 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
   eventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, 0,
                               eventMask, myCGEventCallback, NULL);
 
-  LOG("grab: b\n")
   if (!eventTap) {
     return;
   }
@@ -113,18 +103,12 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
   runLoopSource = CFMachPortCreateRunLoopSource(
                                                 kCFAllocatorDefault, eventTap, 0);
 
-  LOG("grab: c\n")
-
   // Add to the current run loop.
   CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource,
                      kCFRunLoopCommonModes);
 
-  LOG("grab: d\n")
-
   // Enable the event tap.
   CGEventTapEnable(eventTap, true);
-
-  LOG("grab: e\n")
 
   // Set it all running. This will block.
   CFRunLoopRun();
@@ -136,7 +120,7 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
 {
   static CGEventFlags currentFlags = 0; 
 
-  LOG("-")
+  LOG("sending key\n")
 
   if (keycode < 0) {
     
@@ -165,6 +149,7 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
        (CGKeyCode) keycode, 
        direction == KG_DOWN);
     CGEventSetFlags(evt, currentFlags);
+    LOG("Calling CGEventPost\n");
     CGEventPost(kCGSessionEventTap, evt);
     CFRelease(evt);
   }

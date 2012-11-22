@@ -186,5 +186,6 @@
                     (.put queue {:key (code-to-key key)
                                  :direction (if (zero? direction) :up :dn)
                                  :context nil})))]
+    (log/debug (str "Handler: " handler))
     (OSXPlatform. (future (KeyGrabber/grab handler))
                   queue)))

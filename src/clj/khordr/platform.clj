@@ -1,7 +1,7 @@
 (ns khordr.platform
   "An abstraction over the underlying operating system for things like
   sending and receiving key events."
-  (:require [khordr :as k]))
+  (:require [khordr.logging :as log]))
 
 (defn windows?
   "Return true if the provided name identifies a Windows operating system."
@@ -41,6 +41,6 @@
   (let [os (os)
         plat-ns-name (str "khordr.platform." (name os))
         plat-ns-sym (symbol plat-ns-name)]
-    (println "Platform namespace: " plat-ns-name)
+    (log/debug (str "Platform namespace: " plat-ns-name))
     (require plat-ns-sym)
     (initialize os)))

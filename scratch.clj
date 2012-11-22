@@ -632,3 +632,20 @@ eventTap
 
 (.getPointer (.getPointer eventTap 0) 0)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;(System/loadLibrary "khordr")
+
+(def results (atom []))
+(def eh (reify khordr.KeyEventHandler (onKeyEvent [_ evt] (swap! results conj (.getKey evt)) evt)))
+(khordr.KeyGrabber/grab eh)
+
+khordr.KeyGrabber
+
+(khordr.KeyGrabber/send nil)
+
+(def counter (atom 0))
+(def h (reify khordr.TestHandler (onTest [_ i] (swap! counter inc))))
+(khordr.KeyGrabber/test h)
+
+@results

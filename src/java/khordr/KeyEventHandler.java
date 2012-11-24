@@ -1,5 +1,6 @@
 package khordr;
 
 public interface KeyEventHandler {
-    public void onKeyEvent(int key, int direction); 
+    // Returns true if the key should be allowed through
+    public boolean onKeyEvent(int key, int direction);
 }

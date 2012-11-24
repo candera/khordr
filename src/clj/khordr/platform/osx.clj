@@ -13,8 +13,8 @@
    99  :f3
    118 :f4
    96  :f5
-   97  :f6 
-   98  :f7 
+   97  :f6
+   98  :f7
    100 :f8
    101 :f9
    109 :f10
@@ -157,35 +157,50 @@
         (recur (conj acc (first c)) (rest c)))
       acc)))
 
+(defn- thread-name
+  "Returns the name of the current thread"
+  []
+  (.getName (Thread/currentThread)))
+
 (defrecord OSXPlatform [grabf queue]
   c/IPlatform
   (await-key-event [this]
     (let [received (.take queue)
           {:keys [key direction]} received]
-      ;; Is this a key we sent? If so, mark it as seen and wait for
-      ;; the next one. This probably needs to get updated so it deals
-      ;; with the fact that a send of SHIFT might come in a either a
-      ;; right or left shift.
-      (if (some #(= [key direction] %) @sent-keys)
-        (do 
-          (swap! sent-keys remove-first [key direction])
-          (recur))
-        received)))
+      (log/debug {:type :osx/await-key-event
+                  :thread (thread-name)
+                  :received received
+                  :sent-keys @sent-keys})
+      received))
   (send-key [this {:keys [key direction]}]
-    (log/debug [:sending key direction])
+    (log/debug {:type :osx/sending-key :thread (thread-name) :data [key direction]})
     (swap! sent-keys conj [key direction])
     (KeyGrabber/send (key-to-code key) (if (= direction :dn) 1 0)))
   (cleanup [this]
     ;; TODO: Fix this - do a proper shutdown
     (future-cancel grabf)))
 
+(defn handler [queue]
+  (reify khordr.KeyEventHandler
+    (onKeyEvent [_ code direction-num]
+      (log/debug {:type :osx/on-key-event :thread (thread-name) :data [code direction-num]})
+      ;; Is this a key we sent? If so, allow it through. Otherwise,
+      ;; suppress it. This probably needs to get updated so it deals
+      ;; with the fact that a send of SHIFT might come in a either a
+      ;; right or left shift.
+      (let [key (code-to-key code)
+            direction (if (zero? direction-num) :up :dn)
+            we-sent? (some #{[key direction]} @sent-keys)]
+        (if we-sent?
+          (swap! sent-keys remove-first [key direction])
+          (.put queue {:key key :direction direction :context nil}))
+        (log/debug {:type :osx/on-key-event :thread (thread-name) :we-sent we-sent?})
+        ;; Convert to a true boolean
+        (if we-sent? true false)))))
+
 (defmethod p/initialize :khordr.os/osx [_]
-  (let [queue (LinkedBlockingQueue.)
-        handler (reify khordr.KeyEventHandler
-                  (onKeyEvent [_ key direction]
-                    (.put queue {:key (code-to-key key)
-                                 :direction (if (zero? direction) :up :dn)
-                                 :context nil})))]
-    (log/debug (str "Handler: " handler))
-    (OSXPlatform. (future (KeyGrabber/grab handler))
+  (let [queue (LinkedBlockingQueue.)]
+    (log/debug {:type :osx/initialize :handler (str "Handler: " handler)})
+    (OSXPlatform. (future (.setName (Thread/currentThread) "grabber")
+                          (KeyGrabber/grab (handler queue)))
                   queue)))

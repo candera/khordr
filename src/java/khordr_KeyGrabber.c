@@ -19,36 +19,34 @@ jobject eventSink = NULL;
 jmethodID onKeyEvent = NULL;
 JNIEnv* jnienv = NULL;
 
-void ReportKey(int keycode, int direction)
+bool ReportKey(int keycode, int direction)
 {
-    (*jnienv)->CallVoidMethod(jnienv, eventSink, onKeyEvent, keycode, direction, 0);
+  return (bool) (*jnienv)->CallBooleanMethod(jnienv, eventSink, onKeyEvent, keycode, direction, 0);
 }
 
-void ReportIf(int flags, int previousFlags, int mask, int keycode)
+bool ReportIf(int flags, int previousFlags, int mask, int keycode)
 {
   int xorFlags = flags ^ previousFlags;
   if ((xorFlags & mask) == mask) {
-    ReportKey(keycode, (flags & mask) == 0 ? KG_UP : KG_DOWN);
+    return ReportKey(keycode, (flags & mask) == 0 ? KG_UP : KG_DOWN);
   }
 }
-
-
 
 CGEventRef
 myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
                   CGEventRef event, void *refcon)
 {
   static CGEventFlags previousFlags = 0;
-  bool suppress = false;
+  bool allow = false;
 
-  LOG(".")
+  LOG("Event received\n")
 
   if ((type == kCGEventKeyDown) ||
       (type == kCGEventKeyUp)) {
 
     CGKeyCode keycode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     int direction = type == kCGEventKeyDown ? KG_DOWN : KG_UP;
-    ReportKey(keycode, direction);
+    allow = ReportKey(keycode, direction);
   }
   else if (type == kCGEventFlagsChanged) {
     CGEventFlags flags = CGEventGetFlags(event);
@@ -56,6 +54,10 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     // TODO: Don't forget about capslock Hmm: Looks like capslock
     // might not be possible to catch using this code. Might need to
     // investigate IOHIDLib instead.
+
+    // TODO: Figure out how to combine all of these into a single
+    // suppress/don't suppress flag.
+    allow = true;
 
     ReportIf(flags, previousFlags, NX_DEVICELCTLKEYMASK,   KG_LCONTROL);
     ReportIf(flags, previousFlags, NX_DEVICERCTLKEYMASK,   KG_RCONTROL);
@@ -69,17 +71,23 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     previousFlags = flags;
   }
 
-  return NULL;
-
+  if (allow) {
+    LOG("Allowing event\n");
+    return event;
+  }
+  else {
+    LOG("Suppressing event\n");
+    return NULL;
+  }
 }
 
 JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
-(JNIEnv *env, 
+(JNIEnv *env,
  jclass kgcls,
  jobject sink)
 {
   jclass cls = (*env)->GetObjectClass(env, sink);
-  onKeyEvent = (*env)->GetMethodID(env, cls, "onKeyEvent", "(II)V");
+  onKeyEvent = (*env)->GetMethodID(env, cls, "onKeyEvent", "(II)Z");
   eventSink = (*env)->NewGlobalRef(env, sink);
   jnienv = env;
 
@@ -118,15 +126,15 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
 JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
   (JNIEnv *env, jclass kgcls, jint keycode, jint direction)
 {
-  static CGEventFlags currentFlags = 0; 
+  static CGEventFlags currentFlags = 0;
 
-  LOG("sending key\n")
+  // LOG("sending key\n")
 
   if (keycode < 0) {
-    
+
     CGEventFlags flag = 0;
 
-    switch (keycode) { 
+    switch (keycode) {
       case KG_RCONTROL: flag = NX_CONTROLMASK; break;
       case KG_LCONTROL: flag = NX_CONTROLMASK; break;
       case KG_LSHIFT: flag = NX_SHIFTMASK; break;
@@ -135,7 +143,7 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
       case KG_RCOMMAND: flag = NX_COMMANDMASK; break;
       case KG_LALT: flag = NX_ALTERNATEMASK; break;
       case KG_RALT: flag = NX_ALTERNATEMASK; break;
-      }      
+      }
 
     if (direction == KG_UP) {
       currentFlags &= ~flag;
@@ -145,14 +153,13 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
   }
   else {
     CGEventRef evt = CGEventCreateKeyboardEvent
-      (NULL, 
-       (CGKeyCode) keycode, 
+      (NULL,
+       (CGKeyCode) keycode,
        direction == KG_DOWN);
     CGEventSetFlags(evt, currentFlags);
-    LOG("Calling CGEventPost\n");
+    // LOG("Calling CGEventPost\n");
     CGEventPost(kCGSessionEventTap, evt);
     CFRelease(evt);
   }
 
 }
-

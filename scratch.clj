@@ -649,3 +649,27 @@ khordr.KeyGrabber
 (khordr.KeyGrabber/test h)
 
 @results
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(use 'khordr.platform.osx)
+(require '[khordr.platform.common :as com])
+
+(def q (java.util.concurrent.LinkedBlockingQueue.))
+(def p (khordr.platform.osx.OSXPlatform. (future) q))
+
+@sent-keys
+
+(.put q {:key :a :direction :up})
+(.put q {:key :b :direction :dn})
+(.put q {:key :a :direction :up})
+
+q
+p
+
+(.take q)
+
+(com/await-key-event p)
+
+(swap! sent-keys conj [:b :dn])
+

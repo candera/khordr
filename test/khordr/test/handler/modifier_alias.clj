@@ -19,7 +19,15 @@
 
 (deftest modifier-repeat-and-release
   (kt [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
-      [[:j :dn] [:j :up]]))
+      [[:rshift :dn] [:rshift :dn] [:rshift :dn] [:rshift :up]]))
+
+(deftest modifier-single-repeat
+  (kt [[:j :dn] [:j :dn]]
+      [[:rshift :dn]]))
+
+(deftest modifier-repeat-aliases-immediately
+  (kt [[:j :dn] [:j :dn] [:x :dn]]
+      [[:rshift :dn] [:x :dn]]))
 
 (deftest await-decision
   ;; Modifier alias with regular key press results in no events

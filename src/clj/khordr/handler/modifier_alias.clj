@@ -74,7 +74,8 @@
       (cond
        (and modifier? down?)
        (if (= key trigger)
-         {:handler this}                ; It's a repeat
+         {:handler (Aliasing. [(aliases key)] [] aliases)
+          :effects [(key-effect keyevent (aliases key) :dn)]}                ; It's a repeat
          {:handler (MultiArmed. [trigger key] aliases)})
 
        (and modifier? up?)

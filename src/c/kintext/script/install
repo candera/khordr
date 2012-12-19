@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sudo cp -R build/Debug/kintext.kext /tmp
+sudo kextload /tmp/kintext.kext

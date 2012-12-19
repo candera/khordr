@@ -23,6 +23,14 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
 JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
   (JNIEnv *, jclass, jint, jint);
 
+/*
+ * Class:     khordr_KeyGrabber
+ * Method:    stop
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_khordr_KeyGrabber_stop
+  (JNIEnv *, jclass);
+
 #ifdef __cplusplus
 }
 #endif

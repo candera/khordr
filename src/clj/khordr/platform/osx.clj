@@ -57,7 +57,7 @@
    33  :lbracket
    30  :rbracket
    42  :backslash
-   ;; ?? :capslock
+   ;; ?? :capslock         ; Can't catch capslock in Cocoa
    0   :a
    1   :s
    2   :d
@@ -70,7 +70,8 @@
    41  :semicolon
    39  :quote
    36  :enter
-   -3  :lshift
+   56  [:lshift :rshift]                ; Can't distinguish left/right
+                                        ; in Cocoa
    6   :z
    7   :x
    8   :c
@@ -81,15 +82,11 @@
    43  :comma
    47  :period
    44  :slash
-   -4  :rshift
-   -1  :lcontrol
-   -5  [:lcommand :lwindows]
-   -7  [:loption :lalt]
+   55  [:lcommand :rcommand :lwindows :rwindows]
+   58  [:loption :roption :lalt :ralt]
    49  :space
-   -8  [:roption :ralt]
-   -6  [:rcommand :rwindows]
    110 :menu
-   -2  :rcontrol
+   59  [:lcontrol :rcontrol]
    126 :up
    125 :down
    123 :left
@@ -140,6 +137,11 @@
       (filter (fn [[code spec]] (is-match? key spec)))
       ffirst))
 
+(defn canonicalize
+  "Returns the canonical name for a key that has more than one name."
+  [key]
+  (-> key key-to-code code-to-key))
+
 ;; We need to keep track of which keys we've sent, because stupid
 ;; EventTaps send them right back to us, in which case we need to
 ;; ignore them.
@@ -174,11 +176,10 @@
       received))
   (send-key [this {:keys [key direction]}]
     (log/debug {:type :osx/sending-key :thread (thread-name) :data [key direction]})
-    (swap! sent-keys conj [key direction])
+    (swap! sent-keys conj [(canonicalize key) direction])
     (KeyGrabber/send (key-to-code key) (if (= direction :dn) 1 0)))
   (cleanup [this]
-    ;; TODO: Fix this - do a proper shutdown
-    (future-cancel grabf)))
+    (KeyGrabber/stop)))
 
 (defn handler [queue]
   (reify khordr.KeyEventHandler
@@ -194,7 +195,10 @@
         (if we-sent?
           (swap! sent-keys remove-first [key direction])
           (.put queue {:key key :direction direction :context nil}))
-        (log/debug {:type :osx/on-key-event :thread (thread-name) :we-sent we-sent?})
+        (log/debug {:type :osx/on-key-event
+                    :thread (thread-name)
+                    :sent-keys @sent-keys
+                    :we-sent we-sent?})
         ;; Convert to a true boolean
         (if we-sent? true false)))))
 

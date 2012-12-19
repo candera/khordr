@@ -6,21 +6,24 @@
 #define KG_UP 0
 #define KG_DOWN 1
 
-#define KG_LCONTROL -1
-#define KG_RCONTROL -2
-#define KG_LSHIFT -3
-#define KG_RSHIFT -4
-#define KG_LCOMMAND -5
-#define KG_RCOMMAND -6
-#define KG_LALT -7
-#define KG_RALT -8
+#define KG_LCONTROL 59
+#define KG_RCONTROL 59
+#define KG_LSHIFT 56
+#define KG_RSHIFT 56
+#define KG_LCOMMAND 55
+#define KG_RCOMMAND 55
+#define KG_LALT 58
+#define KG_RALT 58
 
 jobject eventSink = NULL;
 jmethodID onKeyEvent = NULL;
 JNIEnv* jnienv = NULL;
+CFRunLoopRef runLoop = NULL;
 
 bool ReportKey(int keycode, int direction)
 {
+  fprintf(stdout, "callback: reporting event - %d, %d\n", keycode, direction);
+  fflush(stdout);
   return (bool) (*jnienv)->CallBooleanMethod(jnienv, eventSink, onKeyEvent, keycode, direction, 0);
 }
 
@@ -39,11 +42,10 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
   static CGEventFlags previousFlags = 0;
   bool allow = false;
 
-  LOG("Event received\n")
-
   if ((type == kCGEventKeyDown) ||
       (type == kCGEventKeyUp)) {
 
+    LOG("callback: key up/down\n");
     CGKeyCode keycode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     int direction = type == kCGEventKeyDown ? KG_DOWN : KG_UP;
     allow = ReportKey(keycode, direction);
@@ -55,28 +57,29 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     // might not be possible to catch using this code. Might need to
     // investigate IOHIDLib instead.
 
-    // TODO: Figure out how to combine all of these into a single
-    // suppress/don't suppress flag.
-    allow = true;
+    // Report the event if at least one of them is allowed
 
-    ReportIf(flags, previousFlags, NX_DEVICELCTLKEYMASK,   KG_LCONTROL);
-    ReportIf(flags, previousFlags, NX_DEVICERCTLKEYMASK,   KG_RCONTROL);
-    ReportIf(flags, previousFlags, NX_DEVICELSHIFTKEYMASK, KG_LSHIFT);
-    ReportIf(flags, previousFlags, NX_DEVICERSHIFTKEYMASK, KG_RSHIFT);
-    ReportIf(flags, previousFlags, NX_DEVICELCMDKEYMASK,   KG_LCOMMAND);
-    ReportIf(flags, previousFlags, NX_DEVICERCMDKEYMASK,   KG_RCOMMAND);
-    ReportIf(flags, previousFlags, NX_DEVICELALTKEYMASK,   KG_LALT);
-    ReportIf(flags, previousFlags, NX_DEVICERALTKEYMASK,   KG_RALT);
+    LOG("callback: flags changed\n");
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICELCTLKEYMASK,   KG_LCONTROL);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICERCTLKEYMASK,   KG_RCONTROL);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICELSHIFTKEYMASK, KG_LSHIFT);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICERSHIFTKEYMASK, KG_RSHIFT);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICELCMDKEYMASK,   KG_LCOMMAND);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICERCMDKEYMASK,   KG_RCOMMAND);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICELALTKEYMASK,   KG_LALT);
+    allow = allow || ReportIf(flags, previousFlags, NX_DEVICERALTKEYMASK,   KG_RALT);
 
-    previousFlags = flags;
+    if (allow) {
+      previousFlags = flags;
+    }
   }
 
   if (allow) {
-    LOG("Allowing event\n");
+    LOG("callback: Allowing event\n");
     return event;
   }
   else {
-    LOG("Suppressing event\n");
+    LOG("callback: Suppressing event\n");
     return NULL;
   }
 }
@@ -108,11 +111,11 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
   }
 
   // Create a run loop source.
-  runLoopSource = CFMachPortCreateRunLoopSource(
-                                                kCFAllocatorDefault, eventTap, 0);
+  runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0);
 
   // Add to the current run loop.
-  CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource,
+  runLoop = CFRunLoopGetCurrent();
+  CFRunLoopAddSource(runLoop, runLoopSource,
                      kCFRunLoopCommonModes);
 
   // Enable the event tap.
@@ -126,40 +129,71 @@ JNIEXPORT void JNICALL Java_khordr_KeyGrabber_grab
 JNIEXPORT void JNICALL Java_khordr_KeyGrabber_send
   (JNIEnv *env, jclass kgcls, jint keycode, jint direction)
 {
-  static CGEventFlags currentFlags = 0;
-
   // LOG("sending key\n")
+  static CGEventFlags flags = 0;
 
-  if (keycode < 0) {
+  CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+  CGEventRef evt = CGEventCreateKeyboardEvent
+    (eventSource,
+     (CGKeyCode) keycode,
+     direction == KG_DOWN);
 
-    CGEventFlags flag = 0;
-
-    switch (keycode) {
-      case KG_RCONTROL: flag = NX_CONTROLMASK; break;
-      case KG_LCONTROL: flag = NX_CONTROLMASK; break;
-      case KG_LSHIFT: flag = NX_SHIFTMASK; break;
-      case KG_RSHIFT: flag = NX_SHIFTMASK; break;
-      case KG_LCOMMAND: flag = NX_COMMANDMASK; break;
-      case KG_RCOMMAND: flag = NX_COMMANDMASK; break;
-      case KG_LALT: flag = NX_ALTERNATEMASK; break;
-      case KG_RALT: flag = NX_ALTERNATEMASK; break;
-      }
-
-    if (direction == KG_UP) {
-      currentFlags &= ~flag;
-    } else {
-      currentFlags |= flag;
+  if (direction == KG_UP) {
+    if (keycode == KG_LSHIFT) {
+      flags &= ~NX_DEVICELSHIFTKEYMASK;
+    }
+    else if (keycode == KG_LALT) {
+      flags &= ~NX_DEVICERALTKEYMASK;
+    }
+    else if (keycode == KG_LCOMMAND) {
+      flags &= ~NX_DEVICELCMDKEYMASK;
+    }
+    else if (keycode == KG_LCONTROL) {
+      flags &= ~NX_DEVICELCTLKEYMASK;
     }
   }
   else {
-    CGEventRef evt = CGEventCreateKeyboardEvent
-      (NULL,
-       (CGKeyCode) keycode,
-       direction == KG_DOWN);
-    CGEventSetFlags(evt, currentFlags);
-    // LOG("Calling CGEventPost\n");
-    CGEventPost(kCGSessionEventTap, evt);
-    CFRelease(evt);
+    if (keycode == KG_LSHIFT) {
+      flags |= NX_DEVICELSHIFTKEYMASK;
+    }
+    else if (keycode == KG_LALT) {
+      flags |= NX_DEVICERALTKEYMASK;
+    }
+    else if (keycode == KG_LCOMMAND) {
+      flags |= NX_DEVICELCMDKEYMASK;
+    }
+    else if (keycode == KG_LCONTROL) {
+      flags |= NX_DEVICELCTLKEYMASK;
+    }
   }
 
+  printf("send: flags now 0x%x\n", (unsigned int) flags);
+  fflush(stdout);
+
+  if (keycode == KG_LSHIFT || keycode == KG_LCONTROL ||
+      keycode == KG_LALT || keycode == KG_LCOMMAND) {
+    CGEventPost(kCGSessionEventTap, evt);
+    /* if (direction == KG_DOWN) { */
+    /*   LOG("send: not sending modifier\n"); */
+    /* } */
+    /* else { */
+    /* } */
+  }
+  else {
+    CGEventSetFlags(evt, flags);
+    CGEventPost(kCGSessionEventTap, evt);
+  }
+  CFRelease(evt);
+  CFRelease(eventSource);
+
+}
+
+JNIEXPORT void JNICALL Java_khordr_KeyGrabber_stop
+  (JNIEnv *env, jclass kgcls)
+{
+  LOG("stop: shutting down\n");
+  // I have no idea if this is correct: should I be stopping the run
+  // loop from a different thread? Do I need to call
+  // CFRetain/CFRelease?
+  CFRunLoopStop(runLoop);
 }

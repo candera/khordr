@@ -36,4 +36,5 @@
                     :stacktrace-str (with-out-str (trace/print-stack-trace t))}))
       (finally
         (com/cleanup platform)
+        (shutdown-agents)
         (log/info "Done")))))

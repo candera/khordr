@@ -26,6 +26,8 @@
 	<dict>
 		<key>KIntExt</key>
 		<dict>
+			<key>IOUserClientClass</key>
+			<string>org_craigandera_driver_kintext_client</string>
 			<key>CFBundleIdentifier</key>
 			<string>org.craigandera.driver.${PRODUCT_NAME:rfc1034Identifier}</string>
 			<key>IOClass</key>

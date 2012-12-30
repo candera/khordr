@@ -10,6 +10,8 @@
 		32D94FC60562CBF700B6AF17 /* kintext.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A224C3EFF42367911CA2CB7 /* kintext.h */; };
 		32D94FC80562CBF700B6AF17 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C167DFE841241C02AAC07 /* InfoPlist.strings */; };
 		32D94FCA0562CBF700B6AF17 /* kintext.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1A224C3FFF42367911CA2CB7 /* kintext.cpp */; settings = {ATTRIBUTES = (); }; };
+		D58478721690D78500D92BF0 /* kintext_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D58478701690D78500D92BF0 /* kintext_client.cpp */; };
+		D58478731690D78500D92BF0 /* kintext_client.h in Headers */ = {isa = PBXBuildFile; fileRef = D58478711690D78500D92BF0 /* kintext_client.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +21,8 @@
 		32D94FCF0562CBF700B6AF17 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		32D94FD00562CBF700B6AF17 /* kintext.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = kintext.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		8DA8362C06AD9B9200E5AC22 /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = /System/Library/Frameworks/Kernel.framework; sourceTree = "<absolute>"; };
+		D58478701690D78500D92BF0 /* kintext_client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kintext_client.cpp; sourceTree = "<group>"; };
+		D58478711690D78500D92BF0 /* kintext_client.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = kintext_client.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +67,8 @@
 		247142CAFF3F8F9811CA285C /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				D58478701690D78500D92BF0 /* kintext_client.cpp */,
+				D58478711690D78500D92BF0 /* kintext_client.h */,
 				1A224C3EFF42367911CA2CB7 /* kintext.h */,
 				1A224C3FFF42367911CA2CB7 /* kintext.cpp */,
 			);
@@ -77,6 +83,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				32D94FC60562CBF700B6AF17 /* kintext.h in Headers */,
+				D58478731690D78500D92BF0 /* kintext_client.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -154,6 +161,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				32D94FCA0562CBF700B6AF17 /* kintext.cpp in Sources */,
+				D58478721690D78500D92BF0 /* kintext_client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

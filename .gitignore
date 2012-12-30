@@ -11,3 +11,4 @@
 /.lein-plugins/
 /logs/*
 *.class
+*.mode1v3

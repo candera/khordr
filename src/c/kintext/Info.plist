@@ -44,6 +44,8 @@
 		<string>9.0.0</string>
 		<key>com.apple.kpi.libkern</key>
 		<string>9.0.0</string>
+		<key>com.apple.iokit.IOHIDFamily</key>
+		<string>1.5</string>
 	</dict>
 </dict>
 </plist>

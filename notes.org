@@ -191,3 +191,37 @@ hitting escape or something. Although that would have the problem that
 then there would be no way to modify whatever the cancellation key
 was. Perhaps backtick? We already use that for a bunch of other
 things, although it's configured that way rather than hard-coded.
+** 2012-Dec-30
+- DONE: Figure out where I want to plug into the keyboard processing chain.
+  Don't take too long on this - there's a reasonable default that I
+  already have working.
+  - Looks like everyone uses the same thing _keyboardEventAction. Not
+    ideal, but it'll work.
+- DONE Add more thorough logging of keyboard events as they happen.
+- Get a simple client set up reading events.
+- Get sending events working.
+- Add thread safety.
+* Time
+** XMas week
+   CLOCK: [2012-12-30 Sun 14:59]
+   CLOCK: [2012-12-30 Sun 13:37]--[2012-12-30 Sun 14:02] =>  0:25
+   CLOCK: [2012-12-30 Sun 10:38]--[2012-12-30 Sun 12:19] =>  1:41
+   CLOCK: [2012-12-25 Tue 09:15]--[2012-12-25 Tue 09:21] =>  0:06
+   CLOCK: [2012-12-24 Mon 09:57]--[2012-12-24 Mon 10:29] =>  0:32
+   CLOCK: [2012-12-24 Mon 07:41]--[2012-12-24 Mon 07:55] =>  0:14
+   CLOCK: [2012-12-24 Mon 06:20]--[2012-12-24 Mon 07:13] =>  0:53
+   CLOCK: [2012-12-23 Sun 10:00]--[2012-12-23 Sun 11:15] =>  1:15
+
+#+BEGIN: clocktable :maxlevel 2 :scope subtree
+Clock summary at [2012-12-30 Sun 14:02]
+
+| Headline     | Time   |      |
+|--------------+--------+------|
+| *Total time* | *5:06* |      |
+|--------------+--------+------|
+| XMas week    |        | 5:06 |
+#+END:
+
+
+
+

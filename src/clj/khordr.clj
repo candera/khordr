@@ -41,7 +41,9 @@
   [behaviors]
   {:behaviors behaviors
    :handler nil
-   :down-keys #{}})
+   :down-keys #{}
+   :last-keyevent-time nil
+   :time-since-last-keyevent nil})
 
 ;; Defines how a matcher like {:key #{:a :b} :direction :up} matches a
 ;; keyevent like {:key :a :direction :dn :device 2}
@@ -215,4 +217,4 @@
                (when result
                  (recur))))))
        (finally
-        (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))))
+        (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))))fs

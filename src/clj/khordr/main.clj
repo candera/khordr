@@ -24,8 +24,12 @@
         (let [event (com/await-key-event platform)
               _     (log/debug {:type :key-event-received
                                 :data event})
+              state (assoc state :time-since-last-keyevent (if-let [last-time (:last-keyevent-time state)] 
+                                                             (- (System/currentTimeMillis) last-time) 
+                                                             Long/MAX_VALUE))
               state (k/handle-keys state event)
-              state (k/enact-effects! state platform)]
+              state (k/enact-effects! state platform)
+              state (assoc state :last-keyevent-time (System/currentTimeMillis))]
           (when-not (:done state)
             (recur state))))
       (catch Throwable t

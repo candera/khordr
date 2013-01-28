@@ -114,7 +114,7 @@ void hookedKeyboardEventAction
   AbsoluteTime ts)
 {
   IOLog("kintext:: Received keyboard event:\n..target 0x%lx\n..eventType %d\n..flags 0x%x\n..key %d\n..charCode %d\n..charSet %d\n..origCharCode %d\n..origCharSet %d\n..keyboardType %d\n..repeat %s\n..ts %ld\n",
-                (unsigned long int) target,
+        (unsigned long int) target,
         eventType,
         flags,
         key,
@@ -124,9 +124,41 @@ void hookedKeyboardEventAction
         origCharSet,
         keyboardType,
         repeat ? "repeat" : "non-repeat",
-                (long int) ts);
+        (long int) ts);
+
+  unsigned int hookedKeyboardCount = hookedKeyboards->getCount();
+  for (int i = 0; i < hookedKeyboardCount; ++i) {
+    if (target == hookedKeyboards->getObject(i)) {
+      IOLog("Event target is keyboard %d\n", i);
+    }
+  }
 
   if (originalKeyboardEventAction) {
+    IOLog("Before forwarding keystroke\n");
+
+    // HACK: Trying to get the kernel log to flush
+    //IOSleep(100);
+
+    if (key == 0) {
+      // TODO: Which one should we use? When we send them through
+      // keyboard 1, which is an instance of IOHidConsumer, it seems
+      // to work, in the sense that events are sent. But the events
+      // appear to be for "volume down", so I think the keycodes are
+      // completely different from what I'm getting here. Also, we're
+      // still crashing at unload time.
+      // TODO: Make this a loop where we look for IOHIDConsumer
+      // Update: I think we actually want the other one: IOHIDKeyboard
+      IOHIKeyboard* keyboard = OSDynamicCast(IOHIKeyboard, hookedKeyboards->getObject(0));
+
+      if (keyboard) {
+        IOLog("Sending down key\n");
+        // kHIDPage_KeyboardOrKeypad == 0x07
+        keyboard->dispatchKeyboardEvent(2, true, ts);
+        IOLog("Sending up key\n");
+        keyboard->dispatchKeyboardEvent(2, false, ts);
+        IOLog("Done sending down/up\n");
+      }
+    }
     (*originalKeyboardEventAction)(target,eventType,flags,key,charCode,charSet,origCharCode,origCharSet,keyboardType,repeat,ts);
   }
 }
@@ -148,6 +180,8 @@ bool org_craigandera_driver_kintext::onKeyboardPublished(void *target,
   if (!keyboard) {
     return false;
   }
+
+  IOLog("kintext:: Keyboard is of class %s\n", keyboard->getMetaClass()->getClassName());
 
   IOLog("kintext:: Keyboard is named %s\n", keyboard->getName());
 

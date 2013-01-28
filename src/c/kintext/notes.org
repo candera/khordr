@@ -1,0 +1,222 @@
+* IOHID System
+
+** Classes
+
+*** OSObject
+
+*** IORegistryEntry
+- Derives from [[OSObject]]
+
+*** IOService
+- Derives from [[IORegistryEntry]]
+**** Methods
+#+begin_src c
+#+end_src
+
+
+*** IOHIDevice
+- Derives from [[IOService]]
+**** Methods
+#+begin_src c
+  virtual bool init(OSDictionary * properties = 0);
+  virtual void free();
+  virtual bool start(IOService * provider);
+  virtual bool open(  IOService *    forClient,
+                      IOOptionBits   options = 0,
+                      void *         arg = 0 );
+
+  virtual UInt32    deviceType();
+  virtual IOHIDKind hidKind();
+  virtual UInt32    interfaceID();
+  virtual bool 	    updateProperties(void);
+  virtual IOReturn  setProperties( OSObject * properties );
+  virtual IOReturn  setParamProperties(OSDictionary * dict);
+  virtual UInt64    getGUID();
+
+  static SInt32		GenerateKey(OSObject *object);
+
+#+end_src
+
+*** IOHIKeyboard
+- Derives from [[IOHIDevice]]
+- Looks like dispatchKeyboardEvent is the method I want to call.
+**** Methods
+#+begin_src c
+protected:
+  virtual void dispatchKeyboardEvent(unsigned int keyCode,
+                     /* direction */ bool         goingDown,
+                     /* timeStamp */ AbsoluteTime time);
+    void    setLastPageAndUsage(UInt16 usagePage, UInt16 usage);
+    void    getLastPageAndUsage(UInt16 &usagePage, UInt16 &usage);
+    void    clearLastPageAndUsage();
+
+public:
+  virtual bool init(OSDictionary * properties = 0);
+  virtual bool start(IOService * provider);
+  virtual void stop(IOService * provider);
+  virtual void free();
+
+  virtual bool open(IOService *                client,
+                    IOOptionBits               options,
+                    KeyboardEventAction        keAction,
+                    KeyboardSpecialEventAction kseAction,
+                    UpdateEventFlagsAction     uefAction);
+
+  bool open(        IOService *                  client,
+                    IOOptionBits                 options,
+                    void *,
+                    KeyboardEventCallback        keCallback,
+                    KeyboardSpecialEventCallback kseCallback,
+                    UpdateEventFlagsCallback     uefCallback);
+
+  virtual void close(IOService * client, IOOptionBits );
+
+  virtual IOReturn message( UInt32 type, IOService * provider,
+                    void * argument = 0 );
+
+  virtual IOHIDKind hidKind();
+  virtual bool      updateProperties( void );
+  virtual IOReturn  setParamProperties(OSDictionary * dict);
+  virtual IOReturn  setProperties( OSObject * properties );
+
+  inline  bool      isRepeat() {return _isRepeat;}
+
+protected: // for subclasses to implement
+  virtual const unsigned char * defaultKeymapOfLength(UInt32 * length);
+  virtual void setAlphaLockFeedback(bool val);
+  virtual void setNumLockFeedback(bool val);
+  virtual UInt32 maxKeyCodes();
+#+end_src
+***** dispatchKeyboardEvent
+This method appears to be responsible for sending the key to the nub
+via IOHIDKeyboardDevice::postKeyboardEvent. Maybe that's the thing I need?
+*** IOHIDInterface
+- Derives from [[IOService]]
+**** Methods
+#+begin_src c
+TODO
+#+end_src
+
+*** IOHIDConsumer
+- Derives from [[IOHIKeyboard]]
+- Provider is [[AppleEmbeddedKeyboard]]
+- Appears to be related to handling special keys, like volume up
+**** Methods
+#+begin_src c
+public:
+    // Allocator
+    static IOHIDConsumer *              Consumer(bool isDispatcher = false);
+
+    // IOService methods
+    virtual bool                        init(OSDictionary *properties=0);
+    virtual bool                        start(IOService * provider);
+
+    virtual void            dispatchConsumerEvent(
+                                IOHIDKeyboard *             sendingkeyboardNub,
+                                AbsoluteTime                timeStamp,
+                                UInt32                      usagePage,
+                                UInt32                      usage,
+                                UInt32                                          value,
+                                IOOptionBits                options = 0);
+
+    inline bool             isDispatcher() { return _isDispatcher;};
+
+    // IOHIKeyboard methods
+    virtual const unsigned char*        defaultKeymapOfLength( UInt32 * length );
+    virtual bool                    doesKeyLock(unsigned key);
+    virtual unsigned                eventFlags();
+    virtual unsigned                deviceFlags();
+    virtual void                    setDeviceFlags(unsigned flags);
+    virtual void                    setNumLock(bool val);
+    virtual bool                    numLock();
+    virtual bool                    alphaLock();
+
+#+end_src
+
+*** IOHIDKeyboard
+- Derives from [[IOHIKeyboard]]
+- Provider is [[AppleEmbeddedKeyboard]]
+**** Methods
+#+begin_src c
+public:
+    // Allocator
+    static IOHIDKeyboard *      Keyboard(UInt32 supportedModifiers, bool isDispatcher = false);
+
+    // IOService methods
+    virtual bool            init(OSDictionary * properties = 0);
+    virtual bool            start(IOService * provider);
+    virtual void            stop(IOService *  provider);
+    virtual void            free();
+
+    inline bool             isDispatcher() { return _isDispatcher;};
+
+    // IOHIDevice methods
+    UInt32                  interfaceID();
+    UInt32                  deviceType();
+
+    // IOHIKeyboard methods
+    const unsigned char *       defaultKeymapOfLength(UInt32 * length);
+    void                    setAlphaLockFeedback(bool LED_state);
+    void                    setNumLockFeedback(bool LED_state);
+    unsigned                getLEDStatus();
+    IOReturn                setParamProperties( OSDictionary * dict );
+
+    void                    dispatchKeyboardEvent(
+                                AbsoluteTime                timeStamp,
+                                UInt32                      usagePage,
+                                UInt32                      usage,
+                                bool                        keyDown,
+                                IOOptionBits                options = 0);
+
+#+end_src
+
+*** IOHIDEventService
+- Derives from [[IOService]]
+
+*** IOHIDEventDriver
+- Derives from [[IOHIDEventService]]
+
+*** AppleEmbeddedKeyboard
+- Derives from [[IOHIDEventDriver]]
+- Provider is [[IOHIDInterface]]
+
+*** AppleUSBTCKeyboard
+- Derives from [[IOUSBHIDDriver]]
+
+*** IOUSBHIDDriver
+- Derives from [[IOHIDevice]]
+
+
+* Event Flow
+It looks to me like what I want is to call
+IOHIKeyboard::dispatchKeyboardEvent. So far, my attempts to do so are
+resulting in crashes. W
+
+* Notes from reading the book
+- One idea is to implement a driver with a unique match class that
+  attaches to all the keyboards. It should then be able to more fully
+  participate in the process of handling keyboard events.
+  - Maybe it would be a send-only device? I.e. it wouldn't react to
+    keyboard input. We could still suppress keyboard events on the
+    other objects, just not on ours, so the flow would be something
+    like: get an event from a normal object, report and suppress it.
+    Send events via our object. When we receive events from our
+    object, let them flow through unimpeded.
+** TODO Write a simple driver
+The purpose of the experiment would to be to simply see if we can
+attach to a keyboard under another MatchCategory.
+
+Actually, it might be more that we want to write a virtual keyboard.
+So our provider class might be something like IOHIDInterface, and our
+parent class something like IOHIKeyboard. Although I'm not sure how
+we'd get matched to IOHIDInterface. That seems to imply that we
+correspond to some actual piece of hardware. IOResources might make a
+more sensible provider, although at that point I'm not sure how we get
+access to the rest of the system.
+
+** Where I was
+- Got a bit sidetracked from the book reading [[https://developer.apple.com/library/mac/#documentation/DeviceDrivers/Conceptual/HID/overview/overview.html][this]]
+  - It's not clear whether this would help. I need to be able to
+    *intercept* keyboard events, not just read them. And if I send
+    them, they need to be sent in such a way that the sent events are
+    not themselves intercepted.

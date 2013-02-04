@@ -632,3 +632,37 @@ eventTap
 
 (.getPointer (.getPointer eventTap 0) 0)
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def eventcount (atom 0))
+(def i khordr.ApplicationServicesLibrary/INSTANCE)
+(def eventTap (.CGEventTapCreate 
+               i 
+               khordr.ApplicationServicesLibrary$CGEventTapLocation/kCGSessionEventTap
+               khordr.ApplicationServicesLibrary$CGEventTapPlacement/kCGHeadInsertEventTap
+               0
+               khordr.ApplicationServicesLibrary$CGEventType/kCGEventKeyDown
+               (reify khordr.ApplicationServicesLibrary$CGEventTapCallback
+                 (onevent [this _ _ event _] (swap! eventcount inc) nil))
+               nil))
+
+(def runLoopSource (.CFMachPortCreateRunLoopSource
+                    i
+                    nil 
+                    eventTap
+                    0))
+
+(.CFRunLoopAddSource 
+ i
+ (.CFRunLoopGetCurrent i)
+ runLoopSource
+ (.getPointer (.getGlobalVariableAddress (com.sun.jna.NativeLibrary/getInstance "ApplicationServices") "kCFRunLoopCommonModes")
+              0))
+
+
+(.CGEventTapEnable i eventTap true)
+
+(.CFRunLoopRun i)
+kx4k

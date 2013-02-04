@@ -191,10 +191,10 @@
   (cleanup [this]
     (.interception_destroy_context InterceptionLibrary/INSTANCE context)))
 
-(defmethod initialize :khordr.os/windows
-  "Return an implementation of IPlatform suitable for use on Windows
-  operating systems."
-  []
+;; Return an implementation of IPlatform suitable for use on Windows
+;; operating systems.
+(defmethod khordr.platform/initialize :khordr.os/windows
+  [os]
   (let [context (.interception_create_context InterceptionLibrary/INSTANCE)]
     (log/debug {:type :context-created
                 :data context})

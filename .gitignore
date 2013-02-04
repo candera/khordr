@@ -10,3 +10,4 @@
 /target
 /.lein-plugins/
 /logs/*
+*.class

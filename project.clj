@@ -8,5 +8,6 @@
   :repositories {;; "local" "file:repo"
                  "sonatype" "http://oss.sonatype.org/content/repositories/releases"
                  "nativelibs4java-repo" "http://nativelibs4java.sourceforge.net/maven"}
-  :jvm-opts ["-Djna.library.path=ext"]
+  :jvm-opts ["-Djna.library.path=ext"
+             "-Djava.library.path=ext"]
   :main khordr.main)

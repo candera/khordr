@@ -29,24 +29,25 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
     // printf("Event thread: %d\n", pthread_mach_thread_np(pthread_self()));
 
 
-    /* // Switch 'a' for 'b' (keycode=0) and make 'z' into 'a' (keycode=6). */
-    /* if (keycode == (CGKeyCode)0) { */
-    /*   // keycode = (CGKeyCode)6; */
-    /*   // Chuck a 'b' in there */
-    /*   CGEventRef evt = CGEventCreateKeyboardEvent(NULL, (CGKeyCode) 1, type == kCGEventKeyDown); */
-    /*   CGEventPost(kCGHIDEventTap, evt); */
-    /*   CFRelease(evt); */
-    /*   /\* CGEventRef evt2 = CGEventCreateKeyboardEvent(NULL, (CGKeyCode) 1, type == kCGEventKeyDown); *\/ */
-    /*   /\* CGEventPost(kCGHIDEventTap, evt2); *\/ */
-    /*   /\* CFRelease(evt2); *\/ */
-    /*   suppress = true; */
-    /* } */
-    /* else if (keycode == (CGKeyCode)6) */
-    /*     keycode = (CGKeyCode)0; */
+    if (keycode == (CGKeyCode)0) {
+      // keycode = (CGKeyCode)6;
+      // Chuck a 'b' in there
 
-    /* // Set the modified keycode field in the event. */
-    /* CGEventSetIntegerValueField( */
-    /*     event, kCGKeyboardEventKeycode, (int64_t)keycode); */
+      /* CGEventRef evt = CGEventCreateKeyboardEvent(NULL, (CGKeyCode) 1, type == kCGEventKeyDown); */
+      /* CGEventPost(kCGHIDEventTap, evt); */
+      /* CFRelease(evt); */
+
+      /* CGEventRef evt2 = CGEventCreateKeyboardEvent(NULL, (CGKeyCode) 1, type == kCGEventKeyDown); */
+      /* CGEventPost(kCGHIDEventTap, evt2); */
+      /* CFRelease(evt2); */
+      suppress = true;
+    }
+    else if (keycode == (CGKeyCode)6)
+        keycode = (CGKeyCode)0;
+
+    // Set the modified keycode field in the event.
+    CGEventSetIntegerValueField(
+        event, kCGKeyboardEventKeycode, (int64_t)keycode);
 
   }
 
@@ -61,7 +62,7 @@ myCGEventCallback(CGEventTapProxy proxy, CGEventType type,
   else if (type == kCGEventFlagsChanged) {
     CGEventFlags flags = CGEventGetFlags(event);
     printf("EventFlagsChanged: 0x%x (%s %s %s %s %s %s %s %s)\n",
-           flags,
+           (int) flags,
            (flags & NX_DEVICELCTLKEYMASK) ? "lcontrol" : "",
            (flags & NX_DEVICERCTLKEYMASK) ? "rcontrol" : "",
            (flags & NX_DEVICELSHIFTKEYMASK) ? "lshift" : "",
@@ -89,20 +90,22 @@ main(void)
 
   // Create an event tap. We are interested in key presses.
   eventMask = ((1 << kCGEventKeyDown) |
-               //(1 << kCGEventKeyUp) |
-               //(1 << kCGEventFlagsChanged)
+               (1 << kCGEventKeyUp) |
+               (1 << kCGEventFlagsChanged)
                );
   eventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, 0,
                               eventMask, myCGEventCallback, NULL);
 
-  printf("eventTap: 0x%lx\n", eventTap);
+  printf("eventTap: 0x%lx\n", (long) eventTap);
   if (!eventTap) {
     fprintf(stderr, "failed to create event tap\n");
     exit(1);
   }
 
   // Create a run loop source.
-  printf("CFMAchPortCreateRunLoopSource(0x%lx, 0x%lx, 0)\n", kCFAllocatorDefault, eventTap);
+  printf("CFMAchPortCreateRunLoopSource(0x%lx, 0x%lx, 0)\n", 
+         (long) kCFAllocatorDefault, 
+         (long) eventTap);
   runLoopSource = CFMachPortCreateRunLoopSource(
                                                 kCFAllocatorDefault, eventTap, 0);
 
@@ -111,7 +114,7 @@ main(void)
                      kCFRunLoopCommonModes);
 
 
-  printf("kCFRunLoopCommonModes: 0x%lx\n", kCFRunLoopCommonModes);
+  printf("kCFRunLoopCommonModes: 0x%lx\n", (long) kCFRunLoopCommonModes);
 
   // Enable the event tap.
   CGEventTapEnable(eventTap, true);

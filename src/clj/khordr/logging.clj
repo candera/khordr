@@ -1,6 +1,8 @@
 (ns khordr.logging)
 
-(def ^:dynamic *log-level* :info)
+(def ^:private l (Object.))
+
+(def ^:dynamic *log-level* :debug)
 
 (def log-level-values
   {:debug 3
@@ -22,14 +24,17 @@
 (defn debug
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :debug))
-    (prn data)))
+    (locking l
+     (prn data))))
 
 (defn info
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :info))
-    (prn data)))
+    (locking l
+      (prn data))))
 
 (defn error
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :error))
-    (prn data)))
+    (locking l
+     (prn data))))

@@ -632,8 +632,6 @@ eventTap
 
 (.getPointer (.getPointer eventTap 0) 0)
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def eventcount (atom 0))
@@ -665,4 +663,45 @@ eventTap
 (.CGEventTapEnable i eventTap true)
 
 (.CFRunLoopRun i)
-kx4k
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;(System/loadLibrary "khordr")
+
+(def results (atom []))
+(def eh (reify khordr.KeyEventHandler (onKeyEvent [_ evt] (swap! results conj (.getKey evt)) evt)))
+(khordr.KeyGrabber/grab eh)
+
+khordr.KeyGrabber
+
+(khordr.KeyGrabber/send nil)
+
+(def counter (atom 0))
+(def h (reify khordr.TestHandler (onTest [_ i] (swap! counter inc))))
+(khordr.KeyGrabber/test h)
+
+@results
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(use 'khordr.platform.osx)
+(require '[khordr.platform.common :as com])
+
+(def q (java.util.concurrent.LinkedBlockingQueue.))
+(def p (khordr.platform.osx.OSXPlatform. (future) q))
+
+@sent-keys
+
+(.put q {:key :a :direction :up})
+(.put q {:key :b :direction :dn})
+(.put q {:key :a :direction :up})
+
+q
+p
+
+(.take q)
+
+(com/await-key-event p)
+
+(swap! sent-keys conj [:b :dn])
+

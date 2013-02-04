@@ -17,7 +17,7 @@
   "Main entry point for the application."
   [& [config-place]]
   (let [behaviors (read-behaviors config-place)
-        platform (p/initialize)]
+        platform (p/platform)]
     (log/info "Initialized")
     (try
       (loop [state (k/base-state behaviors)]

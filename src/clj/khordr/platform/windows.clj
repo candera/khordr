@@ -191,7 +191,7 @@
   (cleanup [this]
     (.interception_destroy_context InterceptionLibrary/INSTANCE context)))
 
-(defn initialize
+(defmethod initialize :khordr.os/windows
   "Return an implementation of IPlatform suitable for use on Windows
   operating systems."
   []

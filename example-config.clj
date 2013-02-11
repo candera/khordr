@@ -1,6 +1,10 @@
 ;; Example configuration file
-{:version 1                             ; Ignored (for now)
+{:version 2                             ; Ignored (for now)
  ;; TODO: Put better comments in here
+ :filters {:before [
+                    ;; Substitute capslock for left control
+                    {:filter khordr.filter.substituter/Filter :args [{:capslock :lcontrol}]}]
+           :after []}
  :behaviors [{:id :right-modifier-aliases
               :match {:key #{:j :k :l}}
               :handler khordr.handler.modifier-alias/Handler
@@ -22,7 +26,6 @@
              {:match {:key :semicolon}
               :handler khordr.handler.simple-alias/Handler
               :args [{:a :home, :e :end}]}
-
              ;; {:id :modifier-suppressors
              ;;  :match {:key #{:rshift :lshift :rcontrol :lcontrol :lalt :ralt :capslock}}
              ;;  :handler khordr.handler.suppressor/Handler}

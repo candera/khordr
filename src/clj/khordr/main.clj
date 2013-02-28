@@ -18,6 +18,7 @@
   [& [config-place]]
   (let [config (read-config config-place)
         platform (p/platform)]
+    (when-let [log-level (:log-level config)] (log/set-log-level! log-level))
     (log/info "Initialized")
     (try
       (loop [state (k/base-state config)]

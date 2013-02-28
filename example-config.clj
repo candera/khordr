@@ -1,5 +1,6 @@
 ;; Example configuration file
 {:version 2                             ; Ignored (for now)
+ :log-level :info
  ;; TODO: Put better comments in here
  :filters {:before [
                     ;; Substitute capslock for left control
@@ -20,12 +21,12 @@
                                         ; to toggle back on
               :match {:key :backtick}
               :handler khordr.handler.special-action/Handler}
-             {:match {:key :a}
-              :handler khordr.handler.simple-alias/Handler
-              :args [{:h :left :j :down :k :up :l :right}]}
-             {:match {:key :semicolon}
-              :handler khordr.handler.simple-alias/Handler
-              :args [{:a :home, :e :end}]}
+             ;; {:match {:key :a}
+             ;;  :handler khordr.handler.simple-alias/Handler
+             ;;  :args [{:h :left :j :down :k :up :l :right}]}
+             ;; {:match {:key :semicolon}
+             ;;  :handler khordr.handler.simple-alias/Handler
+             ;;  :args [{:a :home, :e :end}]}
              ;; {:id :modifier-suppressors
              ;;  :match {:key #{:rshift :lshift :rcontrol :lcontrol :lalt :ralt :capslock}}
              ;;  :handler khordr.handler.suppressor/Handler}

@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [key send])
   (:require [khordr.platform.common :as com]
             [khordr.logging :as log]
+            [khordr.filter :as f]
             [khordr.handler :as h]
             [khordr.effect :as e]))
 
@@ -36,14 +37,10 @@
 ;; Application engine
 
 (defn base-state
-  "An empty key-state value. Used for initializing the application
-  engine."
-  [behaviors]
-  {:behaviors behaviors
-   :handler nil
-   :down-keys #{}
-   :last-keyevent-time nil
-   :time-since-last-keyevent nil})
+  "Returns a state map suitable for initializing the application."
+  [config]
+  (merge config
+         {:down-keys #{}}))
 
 ;; Defines how a matcher like {:key #{:a :b} :direction :up} matches a
 ;; keyevent like {:key :a :direction :dn :device 2}
@@ -128,6 +125,19 @@
   (let [{:keys [key direction]} keyevent]
    (update-in state [:down-keys] (if (= direction :up) disj conj) key)))
 
+(defn apply-filters
+  "Given a state, an event, and a seq of symbols naming filters, return a map with "
+  [state event stage]
+  (let [filters (-> state :filters stage)]
+   (->> filters
+        ;; TODO: Rename make-handler, since it's really about making
+        ;; things that are named.
+        (map #(make-handler (:filter %) (:args %)))
+        (reduce (fn [data filter]
+                  (merge data (f/filter-event filter data)))
+                {:state state
+                 :event event}))))
+
 (defn handle-keys
   "Given the current state and a key event, return an updated state."
   [state keyevent]
@@ -136,11 +146,24 @@
   ;; keyboard the event arrived on.
   (let [{:keys [key direction]} keyevent
         _ (log/debug {:type :keyevent :data keyevent})
+        filtered (apply-filters state keyevent :before)
+        _ (log/debug {:type :filtered-before :data filtered})
+        state (or (:state filtered) state)
+        keyevent (or (:event filtered) keyevent)
+        _ (log/debug {:type :before-filters-done
+                      :state (dissoc state :behaviors)
+                      :event keyevent})
         state (maybe-add-handler state keyevent)
         _ (log/debug {:type :handler-updated :data (dissoc state :behaviors)})
         handler (:handler state)
         results (h/process handler state keyevent)
         _ (log/debug {:type :handler-results :data results})
+        filtered (apply-filters state keyevent :after)
+        state (or (:state filtered) state)
+        keyevent (or (:event filtered) keyevent)
+        _ (log/debug {:type :after-filter-results
+                      :state (dissoc state :behaviors)
+                      :event keyevent})
         ;; Important! Don't update the positions until after we
         ;; process the key, since the new handler might care whether
         ;; any keys are down other than the one that triggered the new
@@ -217,4 +240,4 @@
                (when result
                  (recur))))))
        (finally
-        (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))))fs
+        (.interception_destroy_context InterceptionLibrary/INSTANCE ctx))))))

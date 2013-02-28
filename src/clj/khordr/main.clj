@@ -5,22 +5,23 @@
             [khordr.platform :as p]
             [khordr.platform.common :as com]))
 
-(defn read-behaviors
-  "Given something compatible with slurp, return behaviors. Return
+(defn read-config
+  "Given something compatible with slurp, returns config. Return
   default behaviors if nil."
   [place]
   (if place
-    (-> place slurp read-string :behaviors)
-    k/default-key-behaviors))
+    (-> place slurp read-string)
+    {:behaviors k/default-key-behaviors}))
 
 (defn -main
   "Main entry point for the application."
   [& [config-place]]
-  (let [behaviors (read-behaviors config-place)
+  (let [config (read-config config-place)
         platform (p/platform)]
+    (when-let [log-level (:log-level config)] (log/set-log-level! log-level))
     (log/info "Initialized")
     (try
-      (loop [state (k/base-state behaviors)]
+      (loop [state (k/base-state config)]
         (let [event (com/await-key-event platform)
               _     (log/debug {:type :key-event-received
                                 :data event})

@@ -16,11 +16,6 @@
   []
   *log-level*)
 
-(defn set-log-level!
-  "Sets logging level to level, which must be one of :debug, :info, or :error."
-  [level]
-  (alter-var-root #'*log-level* (constantly level)))
-
 (defn debug
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :debug))
@@ -38,3 +33,10 @@
   (when (>= (log-level-values *log-level*) (log-level-values :error))
     (locking l
      (prn data))))
+
+(defn set-log-level!
+  "Sets logging level to level, which must be one of :debug, :info, or :error."
+  [level]
+  (alter-var-root #'*log-level* (constantly level))
+  (info {:type :log-level-change :new-level level}))
+

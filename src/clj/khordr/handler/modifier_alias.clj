@@ -5,9 +5,6 @@
   (:require [khordr.handler :as h])
   (:import khordr.effect.Key))
 
-(def activation-threshold 250)
-(def default-last-keypress-time Long/MAX_VALUE)
-
 (defn conj-if-missing
   "Returns coll with elem conj'd on, but only if coll does not already
   contain elem."
@@ -24,7 +21,7 @@
 ;; Handler: we start here. The very next thing to happen should be
 ;; that we get the key down that activated this handler, which pushes
 ;; us into Armed.
-(defrecord Handler [aliases])
+(defrecord Handler [aliases params])
 
 ;; Armed: the first state of the handler after the initial
 ;; keypress. Means that we're ready to alias if necessary, but
@@ -50,28 +47,34 @@
 (extend-protocol h/KeyHandler
 
   Handler
-  (process [{:keys [aliases] :as this} state keyevent]
+  (process [{:keys [aliases params] :as this} state keyevent]
     (cond
-      ;; If there are already keys down, we don't want to do any special
-      ;; processing: It's a rollover situation
-      (seq (:down-keys state))
-	{:handler nil
-	 :effects [(Key. keyevent)]}
-      (< (or (:time-since-last-keyevent state) default-last-keypress-time) activation-threshold)
-	{:handler nil
-	 :effects [(Key. keyevent)]}
-      :default
-	(let [{:keys [key direction]} keyevent
-	      modifier?               (contains? aliases key)
-	      up?                     (= direction :up)
-	      down?                   (not up?)]
+     ;; If there are already keys down, we don't want to do any special
+     ;; processing: It's a rollover situation
+     (seq (:down-keys state))
+     {:handler nil
+      :effects [(Key. keyevent)]}
+        
+     ;; If the last keypress was more recent than the typethrough
+     ;; threshold, it means that someone is trying to fly along, just
+     ;; typing regular words, and we probably shouldn't try to
+     ;; interpret this as an attempt to alias. 
+     (< (or (:time-since-last-keyevent state) Long/MAX_VALUE)
+        (or (:typethrough-threshold params) -1))
+     {:handler nil
+      :effects [(Key. keyevent)]}
+     :default
+     (let [{:keys [key direction]} keyevent
+           modifier?               (contains? aliases key)
+           up?                     (= direction :up)
+           down?                   (not up?)]
 
-	  (if (and modifier? down?)
-	    {:handler (Armed. key aliases)}
-	    (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
-			    {:keyevent keyevent
-			     :reason :weird-state
-			     :source this}))))))
+       (if (and modifier? down?)
+         {:handler (Armed. key aliases)}
+         (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
+                         {:keyevent keyevent
+                          :reason :weird-state
+                          :source this}))))))
 
   Armed
   (process [{:keys [trigger aliases] :as this} state keyevent]

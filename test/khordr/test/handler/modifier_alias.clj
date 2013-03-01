@@ -7,7 +7,7 @@
   (:import khordr.effect.Key))
 
 (def kt
-  (partial keytest (->Handler {:j :rshift :k :rcontrol})))
+  (partial keytest (->Handler {:j :rshift :k :rcontrol} nil)))
 
 (deftest single-modifier-down
   (kt [[:j :dn]]
@@ -89,7 +89,7 @@
 
 (deftest rollover-including-modifier
   ;; If another key is already down, don't take over
-  (is (= (h/process (->Handler {}) {:down-keys [:r]} {:key :j :direction :dn})
+  (is (= (h/process (->Handler {} nil) {:down-keys [:r]} {:key :j :direction :dn})
          {:handler nil
           :effects [(e/->Key {:key :j :direction :dn})]})))
 
@@ -109,7 +109,7 @@
   ;; If there was a key event very recently, then we're probably
   ;; typing regular keys rather than aliasing, and we shouldn't do
   ;; anything.
-  (is (= (h/process (->Handler {:j :rshift})
+  (is (= (h/process (->Handler {:j :rshift} {:typethrough-threshold 2})
                     {:time-since-last-keyevent 1}
                     {:key :j :direction :dn})
          {:handler nil

@@ -17,9 +17,11 @@
   (kt [[:j :dn] [:j :up]]
       [[:j :dn] [:j :up]]))
 
-(deftest modifier-repeat-and-release
-  (kt [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
-      [[:j :dn] [:j :up]]))
+(deftest modifier-repeats-trigger-aliasing
+  ;; If we hold a modifier down long enough to trigger repeats, it
+  ;; means we want to alias.
+  (kt [[:j :dn] [:j :dn] [:x :dn]]
+      [[:rshift :dn] [:x :dn]]))
 
 (deftest await-decision
   ;; Modifier alias with regular key press results in no events
@@ -97,8 +99,17 @@
   (kt [[:j :dn] [:k :dn] [:k :up] [:k :dn]]
       [[:rshift :dn] [:k :dn] [:k :up] [:k :dn]]))
 
-(deftest repeats-trigger-aliasing
+(deftest regular-key-repeats-trigger-aliasing
   ;; If we see a regular key go down twice in a row without going up
   ;; first, then it's a repeat and we should trigger aliasing.
   (kt [[:j :dn] [:x :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn] [:x :dn]]))
+
+
+(deftest recent-key-prevents-aliasing
+  ;; If there was a key event very recently, then we're probably
+  ;; typing regular keys rather than aliasing, and we shouldn't do
+  ;; anything.
+  (is (= (h/process (->Handler {}) {:time-since-last-keyevent 1} {:key :j :direction :dn})
+         {:handler nil
+          :effects [(e/->Key {:key :j :direction :dn})]})))

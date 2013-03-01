@@ -5,6 +5,29 @@
             [khordr.platform :as p]
             [khordr.platform.common :as com]))
 
+;;; Adding a tray icon
+
+;; TODO: Make this actually work
+(defn create-image
+  []
+  (let [image (java.awt.image.BufferedImage. 32 32 java.awt.image.BufferedImage/TYPE_INT_RGB)
+        graphics (.getGraphics image)]
+    (doto graphics
+      (.setBackground java.awt.Color/black)
+      (.setColor java.awt.Color/red)
+      (.clearRect 0 0 32 32)
+      (.fillOval 0 0 32 32))
+    image))
+
+(defn add-tray-icon
+  []
+  (let [image (create-image)
+        icon (java.awt.TrayIcon. image)]
+    (-> (java.awt.SystemTray/getSystemTray)
+        (.add icon))))
+
+;;; Main
+
 (defn read-config
   "Given something compatible with slurp, returns config. Return
   default behaviors if nil."

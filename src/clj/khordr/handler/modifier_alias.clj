@@ -5,6 +5,9 @@
   (:require [khordr.handler :as h])
   (:import khordr.effect.Key))
 
+(def activation-threshold 250)
+(def default-last-keypress-time Long/MAX_VALUE)
+
 (defn conj-if-missing
   "Returns coll with elem conj'd on, but only if coll does not already
   contain elem."
@@ -48,22 +51,27 @@
 
   Handler
   (process [{:keys [aliases] :as this} state keyevent]
-    ;; If there are already keys down, we don't want to do any special
-    ;; processing: It's a rollover situation
-    (if-not (empty? (:down-keys state))
-      {:handler nil
-       :effects [(Key. keyevent)]}
-      (let [{:keys [key direction]} keyevent
-            modifier?               (contains? aliases key)
-            up?                     (= direction :up)
-            down?                   (not up?)]
+    (cond
+      ;; If there are already keys down, we don't want to do any special
+      ;; processing: It's a rollover situation
+      (seq (:down-keys state))
+	{:handler nil
+	 :effects [(Key. keyevent)]}
+      (< (or (:time-since-last-keyevent state) default-last-keypress-time) activation-threshold)
+	{:handler nil
+	 :effects [(Key. keyevent)]}
+      :default
+	(let [{:keys [key direction]} keyevent
+	      modifier?               (contains? aliases key)
+	      up?                     (= direction :up)
+	      down?                   (not up?)]
 
-        (if (and modifier? down?)
-          {:handler (Armed. key aliases)}
-          (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
-                          {:keyevent keyevent
-                           :reason :weird-state
-                           :source this}))))))
+	  (if (and modifier? down?)
+	    {:handler (Armed. key aliases)}
+	    (throw (ex-info (str "Unexpected key event while ModifierAliasKeyHandler was in the inital state: " keyevent)
+			    {:keyevent keyevent
+			     :reason :weird-state
+			     :source this}))))))
 
   Armed
   (process [{:keys [trigger aliases] :as this} state keyevent]

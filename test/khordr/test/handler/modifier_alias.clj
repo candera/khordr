@@ -105,11 +105,12 @@
   (kt [[:j :dn] [:x :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn] [:x :dn]]))
 
-
 (deftest recent-key-prevents-aliasing
   ;; If there was a key event very recently, then we're probably
   ;; typing regular keys rather than aliasing, and we shouldn't do
   ;; anything.
-  (is (= (h/process (->Handler {}) {:time-since-last-keyevent 1} {:key :j :direction :dn})
+  (is (= (h/process (->Handler {:j :rshift})
+                    {:time-since-last-keyevent 1}
+                    {:key :j :direction :dn})
          {:handler nil
           :effects [(e/->Key {:key :j :direction :dn})]})))

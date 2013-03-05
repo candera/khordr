@@ -7,7 +7,7 @@
   (:import khordr.effect.Key))
 
 (def kt
-  (partial keytest (->Handler {:j :rshift :k :rcontrol})))
+  (partial keytest (->Handler {:j :rshift :k :rcontrol} nil)))
 
 (deftest single-modifier-down
   (kt [[:j :dn]]
@@ -25,7 +25,9 @@
   (kt [[:j :dn] [:j :dn]]
       [[:rshift :dn]]))
 
-(deftest modifier-repeat-aliases-immediately
+(deftest modifier-repeats-trigger-aliasing
+  ;; If we hold a modifier down long enough to trigger repeats, it
+  ;; means we want to alias.
   (kt [[:j :dn] [:j :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn]]))
 
@@ -95,7 +97,7 @@
 
 (deftest rollover-including-modifier
   ;; If another key is already down, don't take over
-  (is (= (h/process (->Handler {}) {:down-keys [:r]} {:key :j :direction :dn})
+  (is (= (h/process (->Handler {} nil) {:down-keys [:r]} {:key :j :direction :dn})
          {:handler nil
           :effects [(e/->Key {:key :j :direction :dn})]})))
 
@@ -105,8 +107,18 @@
   (kt [[:j :dn] [:k :dn] [:k :up] [:k :dn]]
       [[:rshift :dn] [:k :dn] [:k :up] [:k :dn]]))
 
-(deftest repeats-trigger-aliasing
+(deftest regular-key-repeats-trigger-aliasing
   ;; If we see a regular key go down twice in a row without going up
   ;; first, then it's a repeat and we should trigger aliasing.
   (kt [[:j :dn] [:x :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn] [:x :dn]]))
+
+(deftest recent-key-prevents-aliasing
+  ;; If there was a key event very recently, then we're probably
+  ;; typing regular keys rather than aliasing, and we shouldn't do
+  ;; anything.
+  (is (= (h/process (->Handler {:j :rshift} {:typethrough-threshold 2})
+                    {:time-since-last-keyevent 1}
+                    {:key :j :direction :dn})
+         {:handler nil
+          :effects [(e/->Key {:key :j :direction :dn})]})))

@@ -4,12 +4,19 @@
 
 (def ^:dynamic *log-level* :debug)
 
+(def ^:private logger (agent nil))
+
 (def log-level-values
   {:debug 3
    :info 2
    :error 1
    :critial 0
    :silent -1})
+
+(defn log
+  "Write to the log"
+  [data]
+  (send-off logger (fn [a d] (try (prn d) (catch Throwable t))) data))
 
 (defn log-level
   "Returns the current log level"
@@ -19,20 +26,17 @@
 (defn debug
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :debug))
-    (locking l
-     (prn data))))
+    (log data)))
 
 (defn info
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :info))
-    (locking l
-      (prn data))))
+    (log data)))
 
 (defn error
   [data]
   (when (>= (log-level-values *log-level*) (log-level-values :error))
-    (locking l
-     (prn data))))
+    (log data)))
 
 (defn set-log-level!
   "Sets logging level to level, which must be one of :debug, :info, or :error."

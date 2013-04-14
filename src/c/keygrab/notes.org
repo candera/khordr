@@ -1,0 +1,22 @@
+* Things I tried
+
+Send only key up/down events with flags modified for shift on
+HIDEventTab: works.
+
+Send only key up/down events with flags modified for control on
+HIDEventTab: does not work. Puts system into some sort of weird state
+where emacs won't receive any more keys. Not sure what's up with that.
+
+Send only key up/down events with flags modified for control on
+HIDEventTab, plus also send control up at the end: still doesn't work.
+Screws emacs up pretty good until you type a regular key.
+
+For a, send an e down, e up, but set the control flag on the down
+event and not on the up event: still screws up emacs.
+
+I think we might need to somehow send the flags changed event by
+itself. Maybe I can post the down modifier key as well?
+
+Sending an explicit keyboard event with the keycode for left control
+doesn't work.
+

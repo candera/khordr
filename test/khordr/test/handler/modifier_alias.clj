@@ -1,13 +1,15 @@
 (ns khordr.test.handler.modifier-alias
-  (:use clojure.test
-        khordr.handler.modifier-alias)
-  (:require [khordr.handler :as h]
+  (:require [clojure.test :refer :all]
+            [khordr.handler :as h]
+            [khordr.handler.modifier-alias :refer :all]
             [khordr.effect :as e]
             [khordr.test.handler :refer :all])
   (:import khordr.effect.Key))
 
+(def test-handler (->Handler {:j :rshift :k :rcontrol} nil))
+
 (def kt
-  (partial keytest (->Handler {:j :rshift :k :rcontrol} nil)))
+  (partial keytest test-handler))
 
 (deftest single-modifier-down
   (kt [[:j :dn]]
@@ -30,6 +32,15 @@
   ;; means we want to alias.
   (kt [[:j :dn] [:j :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn]]))
+
+(deftest modifier-repeat-release-bug
+  ;; There was a bug where a repeat-triggered modifier alias didn't
+  ;; return to normal operation once the key was released.
+  (let [events [[:j :dn] [:j :dn] [:j :up]]]
+    (kt events
+        [[:rshift :dn] [:rshift :up]])
+    (is (nil? (->> events (run test-handler) :handler)))))
+
 
 (deftest await-decision
   ;; Modifier alias with regular key press results in no events
@@ -113,12 +124,12 @@
   (kt [[:j :dn] [:x :dn] [:x :dn]]
       [[:rshift :dn] [:x :dn] [:x :dn]]))
 
-(deftest recent-key-prevents-aliasing
-  ;; If there was a key event very recently, then we're probably
-  ;; typing regular keys rather than aliasing, and we shouldn't do
-  ;; anything.
-  (is (= (h/process (->Handler {:j :rshift} {:typethrough-threshold 2})
-                    {:time-since-last-keyevent 1}
-                    {:key :j :direction :dn})
-         {:handler nil
-          :effects [(e/->Key {:key :j :direction :dn})]})))
+;; (deftest recent-key-prevents-aliasing
+;;   ;; If there was a key event very recently, then we're probably
+;;   ;; typing regular keys rather than aliasing, and we shouldn't do
+;;   ;; anything.
+;;   (is (= (h/process (->Handler {:j :rshift} {:typethrough-threshold 2})
+;;                     {:time-since-last-keyevent 1}
+;;                     {:key :j :direction :dn})
+;;          {:handler nil
+;;           :effects [(e/->Key {:key :j :direction :dn})]})))

@@ -65,5 +65,6 @@
                     :stacktrace (.getStackTrace t)
                     :stacktrace-str (with-out-str (trace/print-stack-trace t))}))
       (finally
+        (shutdown-agents)
         (com/cleanup platform)
         (log/info "Done")))))

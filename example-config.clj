@@ -9,11 +9,11 @@
  :behaviors [{:id :right-modifier-aliases
               :match {:key #{:j :k :l}}
               :handler khordr.handler.modifier-alias/Handler
-              :args [{:j :rshift :k :rcontrol :l :ralt} {:typethrough-threshold 100}]}
+              :args [{:j :rshift :k :rcontrol :l :ralt} {:typethrough-threshold 50}]}
              {:id :left-modifier-aliases
               :match {:key #{:f :d :s}}
               :handler khordr.handler.modifier-alias/Handler
-              :args [{:f :lshift :d :lcontrol :s :lalt} {:typethrough-threshold 100}]}
+              :args [{:f :lshift :d :lcontrol :s :lalt} {:typethrough-threshold 50}]}
              {:id :special-actions
               :notoggle true            ; Otherwise we'll toggle
                                         ; ourselves off with the other

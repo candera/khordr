@@ -16,8 +16,11 @@
       []))
 
 (deftest modifier-press-and-release
-  (kt [[:j :dn] [:j :up]]
-      [[:j :dn] [:j :up]]))
+  ;; There was a bug where a press-and-release modifier alias didn't
+  ;; return to normal operation once the key was released.
+  (let [events [[:j :dn] [:j :up]]]
+    (kt events events)
+    (is (nil? (->> events (run test-handler) :handler)))))
 
 (deftest modifier-repeat-and-release
   (kt [[:j :dn] [:j :dn] [:j :dn] [:j :dn] [:j :up]]
@@ -133,3 +136,10 @@
                     {:key :j :direction :dn})
          {:handler nil
           :effects [(e/->Key {:key :j :direction :dn})]})))
+
+(deftest multiple-modifiers
+  ;; We should be able to use more than one modifier at a time.
+  (kt [[:j :dn] [:k :dn] [:x :dn] [:x :up]]
+      [[:rshift :dn] [:rcontrol :dn] [:x :dn] [:x :up]]))
+
+

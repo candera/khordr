@@ -11,3 +11,4 @@
 /.lein-plugins/
 /logs/*
 *.class
+/l4j.xml

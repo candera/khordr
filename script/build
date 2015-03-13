@@ -1,0 +1,47 @@
+#!/bin/bash
+
+cd $(dirname $0)/..
+
+PROJECT_VERSION=$(head -1 project.clj | grep -Po '\d+\.\d+\.\d+(-SNAPSHOT)?')
+ARTIFACT_NAME=khordr
+
+echo "Project version detected as ${PROJECT_VERSION}"
+
+lein clean
+lein uberjar
+
+rm l4j.xml
+
+cat <<EOF > l4j.xml
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>console</headerType>
+  <jar>target\\${ARTIFACT_NAME}-${PROJECT_VERSION}-standalone.jar</jar>
+  <outfile>target\\${ARTIFACT_NAME}-${PROJECT_VERSION}.exe</outfile>
+  <errTitle></errTitle>
+  <cmdLine></cmdLine>
+  <chdir></chdir>
+  <priority>normal</priority>
+  <downloadUrl>http://java.com/download</downloadUrl>
+  <supportUrl></supportUrl>
+  <customProcName>false</customProcName>
+  <stayAlive>false</stayAlive>
+  <manifest></manifest>
+  <icon></icon>
+  <jre>
+    <path></path>
+    <minVersion>1.6.0</minVersion>
+    <maxVersion></maxVersion>
+    <jdkPreference>preferJre</jdkPreference>
+    <opt>-Djava.library.path=%EXEDIR%</opt>
+  </jre>
+</launch4jConfig>
+EOF
+
+PROJECT_DIR=$(cygpath -aw $(dirname $0)/..)
+echo "Project directorty is ${PROJECT_DIR}"
+
+cd $(dirname $(which launch4j))
+./launch4jc $PROJECT_DIR/l4j.xml
+
+

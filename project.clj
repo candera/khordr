@@ -13,4 +13,5 @@
   :main khordr.main
   :profiles {:dev {:source-paths ["dev"]
                    :dependencies [[fipp "0.5.2"]]
-                   :repl-options {:init-ns user}}})
+                   :repl-options {:init-ns user}}
+             :uberjar {:aot :all}})

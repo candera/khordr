@@ -86,17 +86,24 @@
         (and modifier? down?)
         {:handler (Armed. (conj down-modifiers key) aliases)}
 
+        ;; Press-and-release of a modifier
+        (and modifier? up? (= 1 (count down-modifiers)))
+        {:handler nil
+         :effects [(key-effect keyevent key :dn)
+                   (key-effect keyevent key :up)]}
+
+        ;; Someone used a modifier to modify a modifier
+        (and modifier? up? (= key (last down-modifiers)))
+        (let [in-use-modifiers (butlast down-modifiers)]
+          {:handler (Aliasing. in-use-modifiers (select-keys aliases in-use-modifiers))
+           :effects (into (mapv #(key-effect keyevent (aliases %) :dn) in-use-modifiers)
+                          (mapv #(key-effect keyevent key %) [:dn :up]))})
+
+        ;; Not modifying: just rollover
         (and modifier? up?)
-        (if (= key (last down-modifiers))
-          ;; Someone used a modifier to modify a modifier
-          (let [in-use-modifiers (butlast down-modifiers)]
-            {:handler (Aliasing. in-use-modifiers (select-keys aliases in-use-modifiers))
-             :effects (into (mapv #(key-effect keyevent (aliases %) :dn) in-use-modifiers)
-                            (mapv #(key-effect keyevent key %) [:dn :up]))})
-          ;; Not modifying: just rollover
-          {:handler nil
-           :effects (conj (mapv #(key-effect keyevent % :dn) down-modifiers)
-                          (key-effect keyevent key :up))})
+        {:handler nil
+         :effects (conj (mapv #(key-effect keyevent % :dn) down-modifiers)
+                        (key-effect keyevent key :up))}
 
         (and (not modifier?) down?)
         {:handler (Deciding. down-modifiers [key] (select-keys aliases down-modifiers))}
@@ -154,7 +161,7 @@
 
                                     :else
                                     down-modifiers)]
-      {:handler (when (seq new-down-modifiers)
+      {:handler (when-not (empty? new-down-modifiers)
                   (Aliasing. new-down-modifiers
                              (select-keys aliases new-down-modifiers)))
        :effects [(key-effect keyevent (get aliases key key) direction)]})))
